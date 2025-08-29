@@ -121,7 +121,7 @@
             <label class="muted">Modo de empacotamento</label>
             <select id="packMode" title="Como estimar a caixa combinada">
               <option value="stack" selected>Empilhar (altura soma)</option>
-              <option value="auto">Auto (base quadrada)</option>
+              <option value="auto">Auto (camadas)</option>
               <option value="side">Lado a lado (comprimento soma)</option>
             </select>
           </div>
@@ -249,7 +249,7 @@ function seedItems(){
     {id:uid(),cat:'impressora',nome:'Epson EcoTank L14150',peso:9.7,alt:24.5,larg:35.8,comp:49.8},
     {id:uid(),cat:'monitor',nome:'Dell P2012H (com base)',peso:2.88,alt:40.12,larg:18.33,comp:47.84},
     {id:uid(),cat:'note',nome:'HP EliteBook 840 G8',peso:1.32,alt:1.79,larg:21.46,comp:32.34},
-    {id:uid(),cat:'geral',nome:'All in One Positivo U1500',peso:4.14,alt:34.2,larg:45.5,comp:3,9}
+    {id:uid(),cat:'geral',nome:'All in One Positivo U1500',peso:4.14,alt:34.2,larg:45.5,comp:3.9}
   ];
 }
 
@@ -381,7 +381,7 @@ function deleteFromModal(){
 
 /* ===== Estimativa de caixa ===== */
 const FATOR_CUBAGEM = 6000;
-const BASE_FACTOR   = 2; // até 2x o maior item antes de começar a empilhar mais
+const BASE_FACTOR   = 2; // até 2x o maior item antes de "espalhar" mais
 
 function getSelectedWithQty(){
   const arr=[];
@@ -400,62 +400,64 @@ function estimateBox(selected){ // selected: [{alt, larg, comp, peso, qty}]
 
   const unidades = selected.reduce((s,it)=>s + (it.qty||0), 0);
 
-  const maxAlt = Math.max(...selected.map(it=>it.alt||0));
+  const maxAlt  = Math.max(...selected.map(it=>it.alt ||0));
   const maxLarg = Math.max(...selected.map(it=>it.larg||0));
-  const maxComp  = Math.max(...selected.map(it=>it.comp ||0));
+  const maxComp = Math.max(...selected.map(it=>it.comp||0));
 
-  const sumAlt = selected.reduce((s,it)=>s + (it.alt||0)*(it.qty||0), 0);
+  const sumAlt  = selected.reduce((s,it)=>s + (it.alt ||0)*(it.qty||0), 0);
   const sumLarg = selected.reduce((s,it)=>s + (it.larg||0)*(it.qty||0), 0);
-  const sumComp  = selected.reduce((s,it)=>s + (it.comp ||0)*(it.qty||0), 0);
+  const sumComp = selected.reduce((s,it)=>s + (it.comp||0)*(it.qty||0), 0);
 
   const volTotal    = selected.reduce((s,it)=>s + (it.alt||0)*(it.larg||0)*(it.comp||0)*(it.qty||0), 0);
-  const sumBaseArea = selected.reduce((s,it)=>s + (it.alt||0)*(it.larg||0)*(it.qty||0), 0);
+  const sumBaseArea = selected.reduce((s,it)=>s + (it.larg||0)*(it.comp||0)*(it.qty||0), 0); // base correta: L×C
 
   let alt, larg, comp;
 
   if (mode === 'stack') {
-    alt = maxAlt;
+    // Empilhar = somar ALTURA; manter base (L e C) como máximos
+    alt  = sumAlt;
     larg = maxLarg;
-    comp  = sumComp;
+    comp = maxComp;
   } else if (mode === 'side') {
-    alt = sumAlt;
+    // Lado a lado = somar COMPRIMENTO; manter A e L como máximos
+    alt  = maxAlt;
     larg = maxLarg;
-    comp  = maxComp;
+    comp = sumComp;
   } else {
     // ===== AUTO (camadas) =====
-    // 1) base "ideal" pelo total de áreas
+    // 1) base "ideal" pelo total de áreas (L×C)
     const squareSide = Math.ceil(Math.sqrt(sumBaseArea));
-    let idealAlt = Math.max(squareSide, maxAlt);
     let idealLarg = Math.max(squareSide, maxLarg);
+    let idealComp = Math.max(squareSide, maxComp);
 
     // 2) limite prático de espalhamento da base
-    const capAlt = Math.ceil(maxAlt * BASE_FACTOR);
     const capLarg = Math.ceil(maxLarg * BASE_FACTOR);
+    const capComp = Math.ceil(maxComp * BASE_FACTOR);
 
-    alt = Math.min(Math.ceil(idealAlt), capAlt);
     larg = Math.min(Math.ceil(idealLarg), capLarg);
+    comp = Math.min(Math.ceil(idealComp), capComp);
 
-    // 3) capacidade por camada usando "células" do maior item
-    const cellsX = Math.max(1, Math.floor(alt / maxAlt));
-    const cellsY = Math.max(1, Math.floor(larg / maxLarg));
+    // 3) capacidade por camada usando "células" do maior item na base
+    const cellsX = Math.max(1, Math.floor(larg / maxLarg));
+    const cellsY = Math.max(1, Math.floor(comp / maxComp));
     const porCamada = Math.max(1, cellsX * cellsY);
 
-    // 4) camadas necessárias e comprimento total
+    // 4) camadas necessárias e ALTURA total
     const camadas = Math.ceil(unidades / porCamada);
-    comp = camadas * maxComp;
+    alt = camadas * maxAlt;
 
-    // Se por algum motivo o volume base ainda ficou insuficiente (itens muito diferentes), garante camadas pelo volume
-    const volBase = alt * larg * maxComp;
-    if (volBase > 0) {
-      const camadasVol = Math.ceil(volTotal / volBase);
-      comp = Math.max(comp, camadasVol * maxComp);
+    // Checagem por volume (garantia)
+    const volBasePorCamada = larg * comp * maxAlt;
+    if (volBasePorCamada > 0) {
+      const camadasVol = Math.ceil(volTotal / volBasePorCamada);
+      alt = Math.max(alt, camadasVol * maxAlt);
     }
   }
 
   // Folgas e arredondamentos
-  alt = Math.ceil(alt + margin);
+  alt  = Math.ceil(alt  + margin);
   larg = Math.ceil(larg + margin);
-  comp  = Math.ceil(comp  + margin);
+  comp = Math.ceil(comp + margin);
 
   const cubado    = (alt * larg * comp) / FATOR_CUBAGEM;
   const pesoTotal = selected.reduce((s,it)=>s + (it.peso||0)*(it.qty||0), 0);
@@ -469,9 +471,9 @@ function updateSummary(){
   const est=estimateBox(sel);
   $('#resCount').textContent=est.unidades+' un.';
   $('#resPeso').textContent=fmtKG(est.pesoTotal);
-  $('#resAlt').textContent=est.alt? (est.alt+' cm') : '–';
-  $('#resLarg').textContent=est.larg? (est.larg+' cm') : '–';
-  $('#resComp').textContent =est.comp ? (est.comp +' cm') : '–';
+  $('#resAlt').textContent = est.alt ? (est.alt+' cm') : '–';
+  $('#resLarg').textContent= est.larg? (est.larg+' cm') : '–';
+  $('#resComp').textContent= est.comp? (est.comp+' cm') : '–';
   $('#resCubado').textContent=fmtKG(est.cubado);
 }
 function clearCurrentSimulation(){
@@ -529,7 +531,7 @@ function saveSimulation(name){
   simsMain.sort((a,b)=>new Date(b.dateISO)-new Date(a.dateISO));
   if(simsMain.length>10){ simsMain=simsMain.slice(0,10); }
   saveSims(); renderSims();
-  openSimDetails(sim.id, true); // abre os itens da cotação recém salva
+  openSimDetails(sim.id, true);
   alert('Cotação salva!');
 }
 function renderSims(){
@@ -581,9 +583,9 @@ function applySim(id){
   $('#margin').value=sim.margin||0;
   selectedIds=new Set();
   qtyMap=new Map();
-  if(sim.selected){ // versão nova com qty
+  if(sim.selected){
     sim.selected.forEach(s=>{ selectedIds.add(s.id); qtyMap.set(s.id, clampQty(s.qty||1)); });
-  }else{ // fallback (versões antigas)
+  }else{
     (sim.selectedIds||[]).forEach(id=>selectedIds.add(id));
     (sim.snapshot||[]).forEach(s=>{
       const it=items.find(x=>x.nome===s.nome);
