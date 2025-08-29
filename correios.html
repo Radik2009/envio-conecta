@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simulação de Envio Smart Conecta</title>
+<style>
+  :root{
+    --brand:#16a34a; --brand-2:#0f7a36; --brand-3:#1ed760;
+    --bg:#0a0f0c; --panel:#101a13; --ink:#e9f7ec; --muted:#9ad1ac; --line:#1a2a1f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,var(--bg),#0b1711 55%,#0a1410);color:var(--ink)}
+  a{color:var(--brand-3);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1200px;margin:auto;padding:28px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 14px 50px rgba(0,0,0,.35)}
+  .head{padding:20px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .head h1{margin:0;font-size:20px}
+  .head .right{display:flex;gap:12px;align-items:center}
+  .pill{padding:5px 12px;border-radius:999px;background:#0c1a13;color:var(--muted);font-size:12px;border:1px solid var(--line)}
+  .body{padding:22px}
+  .section{margin-top:28px;padding:18px 18px 6px;border:1px dashed var(--line);border-radius:14px;background:#0d1812}
+  .section + .section{margin-top:26px}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0}
+  .btn{background:var(--brand);border:none;color:#fff;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
+  .btn.ghost{background:#102217;border:1px solid var(--line);color:var(--ink)}
+  .btn.red{background:#b63a3a}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  input,select{background:#0c1912;border:1px solid var(--line);color:var(--ink);padding:10px;border-radius:10px;outline:none}
+  input:focus,select:focus{border-color:var(--brand)}
+  /* Abas */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .tab{background:#0f2118;border:1px solid var(--line);color:var(--ink);padding:8px 12px;border-radius:10px;cursor:pointer}
+  .tab.active{background:var(--brand);border-color:var(--brand);color:#0a120d}
+  /* Tabela */
+  .table{width:100%;border-collapse:collapse}
+  .table th,.table td{padding:12px;border-top:1px solid var(--line);text-align:left;font-size:14px}
+  .table th{color:#c9f2d6;font-weight:700}
+  .right{text-align:right}
+  .qty{width:76px;text-align:center}
+  .muted{color:var(--muted);font-size:12px}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(6,1fr)}
+  .col-2{grid-column:span 2}.col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-6{grid-column:span 6}
+  .totbox{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .tot{background:#0c1912;border:1px solid var(--line);border-radius:12px;padding:14px}
+  .tot b{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .tot span{font-size:18px}
+  /* Simulações */
+  .simlist{margin-top:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0d1812}
+  .simlist table{width:100%;border-collapse:collapse}
+  .simlist th,.simlist td{padding:12px;border-top:1px solid var(--line);text-align:left;font-size:14px}
+  .simlist th{color:#c9f2d6}
+  .sim-detail{background:#0c1912}
+  .sim-detail pre{white-space:pre-wrap;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfe9d7}
+  /* Modal */
+  dialog{border:none;border-radius:16px;background:#0d1812;color:#e8f6ec;padding:16px;max-width:560px;width:92%}
+  dialog::backdrop{background:rgba(0,0,0,.5)}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .modal-body{display:grid;gap:10px}
+  .hint{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="head">
+      <h1>Simulação de Envio Smart Conecta</h1>
+      <div class="right">
+        <a href="https://www.smartconecta.com.br/" target="_blank" rel="noopener">smartconecta.com.br</a>
+        <span class="pill">Salvo no navegador</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <!-- Categorias -->
+      <div class="section">
+        <div class="tabs" id="catTabs">
+          <button class="tab active" data-cat="geral">[geral]</button>
+          <button class="tab" data-cat="note">[note]</button>
+          <button class="tab" data-cat="impressora">[impressora]</button>
+          <button class="tab" data-cat="monitor">[monitor]</button>
+          <button class="tab" data-cat="perifericos">[perifericos]</button>
+        </div>
+
+        <div class="toolbar">
+          <button class="btn" id="btnAdd">Adicionar item</button>
+          <button class="btn red" id="btnClear" title="Apagar todos os itens">Limpar itens</button>
+          <input class="search" id="txtSearch" placeholder="Buscar por nome (ex.: hp 840 g8, brother 2540, monitor)">
+          <span class="muted" id="countInfo"></span>
+        </div>
+
+        <!-- Tabela -->
+        <table class="table" id="tbl">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chkAll" title="Selecionar página"></th>
+              <th>Item</th>
+              <th class="right">Peso (kg)</th>
+              <th class="right">Altura (cm)</th>
+              <th class="right">Largura (cm)</th>
+              <th class="right">Comprimento (cm)</th>
+              <th class="right">Qtd</th>
+              <th class="right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+
+        <!-- Paginação -->
+        <div class="toolbar" style="justify-content:flex-end;margin-top:10px">
+          <button class="btn ghost" id="btnPrev" title="Página anterior">&lt;</button>
+          <span class="muted" id="pageInfo">Página 1/1</span>
+          <button class="btn ghost" id="btnNext" title="Próxima página">&gt;</button>
+        </div>
+      </div>
+
+      <!-- Controles de estimativa -->
+      <div class="section">
+        <div class="grid">
+          <div class="col-3">
+            <label class="muted">Modo de empacotamento</label>
+            <select id="packMode" title="Como estimar a caixa combinada">
+              <option value="stack" selected>Empilhar (altura soma)</option>
+              <option value="auto">Auto (base quadrada)</option>
+              <option value="side">Lado a lado (comprimento soma)</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="muted">Folga interna (cm)</label>
+            <input type="number" id="margin" step="1" min="0" value="3" title="Folga adicionada a cada dimensão">
+          </div>
+          <div class="col-6" style="display:flex;gap:10px;align-items:center">
+            <button class="btn" id="btnCopy">Copiar resumo</button>
+            <span class="hint">Selecione itens, ajuste as quantidades e salve como cotação.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumo -->
+      <div class="section">
+        <div class="totbox">
+          <div class="tot"><b>Itens selecionados</b><span id="resCount">0 un.</span></div>
+          <div class="tot"><b>Peso total real</b><span id="resPeso">0,00 kg</span></div>
+          <div class="tot"><b>Peso cubado</b><span id="resCubado">0,00 kg</span></div>
+        </div>
+        <div class="totbox" style="margin-top:12px">
+          <div class="tot"><b>Altura estimada</b><span id="resAlt">–</span></div>
+          <div class="tot"><b>Largura estimada</b><span id="resLarg">–</span></div>
+          <div class="tot"><b>Comprimento estimado</b><span id="resComp">–</span></div>
+        </div>
+        <div class="toolbar" style="margin-top:12px">
+          <button class="btn" id="btnSaveSim">Salvar cotação</button>
+          <button class="btn ghost" id="btnClearSim" title="Limpar seleção e resumo">Limpar simulação</button>
+          <span class="hint">Armazena até <b>10</b> simulações (as mais recentes).</span>
+        </div>
+      </div>
+
+      <!-- Simulações salvas -->
+      <div class="section">
+        <div class="simlist">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th><th>Itens</th><th>Peso</th><th>Caixa (A×L×C)</th><th>Data</th><th class="right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyMain"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer" style="padding:14px 22px">Baseado em dimensões/peso cadastrados. Ajuste conforme o seu mix real.</div>
+  </div>
+</div>
+
+<!-- Modal add/edit -->
+<dialog id="dlg">
+  <div class="modal-head">
+    <h3 id="dlgTitle">Novo item</h3>
+    <button class="btn ghost" id="dlgClose">Fechar</button>
+  </div>
+  <div class="modal-body">
+    <div class="grid">
+      <div class="col-6"><input id="fNome" placeholder="Nome do item (ex.: Brother DCP-L2540DW)"></div>
+      <div class="col-3"><input id="fPeso" type="number" step="0.01" min="0" placeholder="Peso (kg)"></div>
+    </div>
+    <div class="grid">
+      <div class="col-2"><input id="fAlt" type="number" step="0.1" min="0" placeholder="Altura (cm)"></div>
+      <div class="col-2"><input id="fLarg" type="number" step="0.1" min="0" placeholder="Largura (cm)"></div>
+      <div class="col-2"><input id="fComp"  type="number" step="0.1" min="0" placeholder="Comprimento (cm)"></div>
+      <div class="col-6"><span class="hint">O item será salvo na sessão atual <b id="dlgSessaoAtual">[geral]</b>.</span></div>
+    </div>
+    <div class="grid">
+      <div class="col-6" style="display:flex;gap:10px;align-items:center">
+        <button class="btn" id="dlgSave">Salvar</button>
+        <button class="btn red" id="dlgDelete" style="display:none">Excluir</button>
+        <span class="hint" id="dlgHint"></span>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Modal nome da simulação -->
+<dialog id="dlgSim">
+  <div class="modal-head">
+    <h3>Salvar cotação</h3>
+    <button class="btn ghost" id="dlgSimClose">Fechar</button>
+  </div>
+  <div class="modal-body">
+    <input id="simName" placeholder="Nome da simulação (ex.: 2 impressoras + 1 monitor)">
+    <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+      <button class="btn" id="dlgSimSave">Salvar</button>
+      <span class="hint">Mantém no máximo <b>10</b> cotações.</span>
+    </div>
+  </div>
+</dialog>
+
+<script>
+/* ===== Util ===== */
+const $=s=>document.querySelector(s), $all=s=>Array.from(document.querySelectorAll(s));
+const fmtKG=n=>(Number(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' kg';
+const fmtDate=iso=>new Date(iso).toLocaleString('pt-BR');
+const clampQty=v=>Math.max(1,Math.floor(Number(v)||1)); // quantidade
+const clampNonNeg=v=>Math.max(0,Number(v)||0); // peso e dimensões
+const LS_KEY_ITEMS='ri_items_v6';
+const LS_KEY_S1='ri_sims_main_v4';
+function uid(){return Math.random().toString(36).slice(2,9)}
+
+/* ===== Estado ===== */
+let items=loadItems();
+let simsMain=loadSims(LS_KEY_S1);
+let editingId=null;
+
+let currentCat='geral';
+let currentPage=1;
+const perPage=10;
+let selectedIds=new Set();
+let qtyMap=new Map(); // {id -> qtd}
+
+renderTable(); renderSims(); updateCountInfo();
+
+/* ===== Seeds ===== */
+function seedItems(){
+  return [
+    {id:uid(),cat:'impressora',nome:'Brother DCP-L2540DW',peso:11.1,alt:31.6,larg:39.8,comp:40.9},
+    {id:uid(),cat:'impressora',nome:'Brother DCP-L5652DN',peso:17.1,alt:48.6,larg:42.7,comp:49.5},
+    {id:uid(),cat:'impressora',nome:'Brother MFC-L8900CDW',peso:28.6,alt:54.9,larg:52.6,comp:49.5},
+    {id:uid(),cat:'impressora',nome:'Epson EcoTank L14150',peso:9.7,alt:24.5,larg:35.8,comp:49.8},
+    {id:uid(),cat:'monitor',nome:'Dell P2012H (com base)',peso:2.88,alt:40.12,larg:18.33,comp:47.84},
+    {id:uid(),cat:'note',nome:'HP EliteBook 840 G8',peso:1.32,alt:1.79,larg:21.46,comp:32.34},
+    {id:uid(),cat:'geral',nome:'All in One Positivo U1500',peso:4.14,alt:34.2,larg:45.5,comp:39}
+  ];
+}
+
+/* ===== Storage ===== */
+function loadItems(){ const raw=localStorage.getItem(LS_KEY_ITEMS); if(raw){try{return JSON.parse(raw);}catch(e){}} return seedItems(); }
+function saveItems(){ localStorage.setItem(LS_KEY_ITEMS,JSON.stringify(items)); }
+function loadSims(key){ const raw=localStorage.getItem(key); if(raw){try{return JSON.parse(raw);}catch(e){}} return []; }
+function saveSims(){ localStorage.setItem(LS_KEY_S1,JSON.stringify(simsMain)); }
+
+/* ===== Filtro + Paginação ===== */
+function getFiltered(){
+  const q=($('#txtSearch').value||'').trim().toLowerCase();
+  if(currentCat==='geral') return items.filter(it=>it.nome.toLowerCase().includes(q));
+  return items.filter(it=>it.cat===currentCat && it.nome.toLowerCase().includes(q));
+}
+function getPaged(list){
+  const total=list.length;
+  const pages=Math.max(1,Math.ceil(total/perPage));
+  if(currentPage>pages) currentPage=pages;
+  const start=(currentPage-1)*perPage;
+  return {page:list.slice(start,start+perPage), total, pages};
+}
+function updatePager(total,pages){
+  $('#pageInfo').textContent=`Página ${currentPage}/${pages}`;
+  $('#btnPrev').disabled=currentPage<=1;
+  $('#btnNext').disabled=currentPage>=pages;
+  $('#chkAll').checked=false;
+}
+function updateCountInfo(){
+  const totalSegment=(currentCat==='geral'? items.length : items.filter(it=>it.cat===currentCat).length);
+  $('#countInfo').textContent=`Sessão: ${currentCat} • ${totalSegment} itens`;
+}
+
+/* ===== Tabela ===== */
+function renderTable(){
+  const tbody=$('#tbody'); tbody.innerHTML='';
+  const filtered=getFiltered();
+  const {page,total,pages}=getPaged(filtered);
+  page.forEach(it=>{
+    const tr=document.createElement('tr');
+    const checked=selectedIds.has(it.id);
+    const qval = qtyMap.get(it.id) || 1;
+    tr.innerHTML=`
+      <td><input type="checkbox" class="rowchk" data-id="${it.id}" ${checked?'checked':''}></td>
+      <td>${it.nome}</td>
+      <td class="right">${(it.peso||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="right">${it.alt||0}</td>
+      <td class="right">${it.larg||0}</td>
+      <td class="right">${it.comp||0}</td>
+      <td class="right"><input type="number" min="1" step="1" class="qty" data-id="${it.id}" value="${qval}" ${checked?'':'disabled'} title="Quantidade"></td>
+      <td class="right"><button class="btn ghost btnEdit" data-id="${it.id}">Editar</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  $all('.btnEdit').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.id)));
+  $all('.rowchk').forEach(chk=>{
+    chk.addEventListener('change',e=>{
+      const id=e.target.dataset.id;
+      const qtyInput = document.querySelector(`.qty[data-id="${id}"]`);
+      if(e.target.checked){
+        selectedIds.add(id);
+        if(!qtyMap.has(id)) qtyMap.set(id, 1);
+        qtyInput.disabled=false;
+      }else{
+        selectedIds.delete(id);
+        qtyInput.disabled=true;
+      }
+      updateSummary();
+    });
+  });
+  $all('.qty').forEach(inp=>{
+    inp.addEventListener('input',e=>{
+      const id=e.target.dataset.id;
+      const val=clampQty(e.target.value);
+      e.target.value=val;
+      qtyMap.set(id,val);
+      if(selectedIds.has(id)) updateSummary();
+    });
+  });
+  updatePager(total,pages);
+  updateSummary();
+}
+
+/* ===== Modal Add/Edit ===== */
+function openNew(){
+  editingId=null;
+  $('#dlgTitle').textContent='Novo item';
+  $('#fNome').value=''; $('#fPeso').value='';
+  $('#fAlt').value=''; $('#fLarg').value=''; $('#fComp').value='';
+  $('#dlgDelete').style.display='none'; $('#dlgHint').textContent='';
+  $('#dlgSessaoAtual').textContent=`[${currentCat}]`;
+  $('#dlg').showModal();
+}
+function openEdit(id){
+  const it=items.find(x=>x.id===id); if(!it) return;
+  editingId=id;
+  $('#dlgTitle').textContent='Editar item';
+  $('#fNome').value=it.nome; $('#fPeso').value=it.peso;
+  $('#fAlt').value=it.alt; $('#fLarg').value=it.larg; $('#fComp').value=it.comp;
+  $('#dlgDelete').style.display='inline-block';
+  $('#dlgHint').textContent=`ID: ${id} • sessão interna: [${it.cat}]`;
+  $('#dlgSessaoAtual').textContent=`[${it.cat}]`;
+  $('#dlg').showModal();
+}
+function saveFromModal(){
+  const nome=($('#fNome').value||'').trim();
+  const peso=clampNonNeg($('#fPeso').value);
+  const alt=clampNonNeg($('#fAlt').value);
+  const larg=clampNonNeg($('#fLarg').value);
+  const comp=clampNonNeg($('#fComp').value);
+  if(!nome){alert('Informe um nome.');return}
+  const cat=currentCat || 'geral';
+  if(editingId){
+    const i=items.findIndex(x=>x.id===editingId);
+    if(i>=0) items[i]={id:editingId,cat,nome,peso,alt,larg,comp};
+  }else{
+    items.unshift({id:uid(),cat,nome,peso,alt,larg,comp});
+  }
+  saveItems(); updateCountInfo(); $('#dlg').close(); renderTable();
+}
+function deleteFromModal(){
+  if(!editingId) return;
+  if(!confirm('Excluir este item?')) return;
+  items=items.filter(x=>x.id!==editingId);
+  selectedIds.delete(editingId);
+  qtyMap.delete(editingId);
+  saveItems(); updateCountInfo(); $('#dlg').close(); renderTable();
+}
+
+/* ===== Estimativa de caixa ===== */
+const FATOR_CUBAGEM = 6000;
+const BASE_FACTOR   = 2; // até 2x o maior item antes de começar a empilhar mais
+
+function getSelectedWithQty(){
+  const arr=[];
+  selectedIds.forEach(id=>{
+    const it=items.find(x=>x.id===id);
+    if(it){ arr.push({...it, qty: (qtyMap.get(id)||1)}); }
+  });
+  return arr;
+}
+
+function estimateBox(selected){ // selected: [{alt, larg, comp, peso, qty}]
+  if(!selected.length) return {alt:0, larg:0, comp:0, cubado:0, pesoTotal:0, unidades:0};
+
+  const margin = Number($('#margin').value) || 0;
+  const mode   = $('#packMode').value;
+
+  const unidades = selected.reduce((s,it)=>s + (it.qty||0), 0);
+
+  const maxAlt = Math.max(...selected.map(it=>it.alt||0));
+  const maxLarg = Math.max(...selected.map(it=>it.larg||0));
+  const maxComp  = Math.max(...selected.map(it=>it.comp ||0));
+
+  const sumAlt = selected.reduce((s,it)=>s + (it.alt||0)*(it.qty||0), 0);
+  const sumLarg = selected.reduce((s,it)=>s + (it.larg||0)*(it.qty||0), 0);
+  const sumComp  = selected.reduce((s,it)=>s + (it.comp ||0)*(it.qty||0), 0);
+
+  const volTotal    = selected.reduce((s,it)=>s + (it.alt||0)*(it.larg||0)*(it.comp||0)*(it.qty||0), 0);
+  const sumBaseArea = selected.reduce((s,it)=>s + (it.alt||0)*(it.larg||0)*(it.qty||0), 0);
+
+  let alt, larg, comp;
+
+  if (mode === 'stack') {
+    alt = maxAlt;
+    larg = maxLarg;
+    comp  = sumComp;
+  } else if (mode === 'side') {
+    alt = sumAlt;
+    larg = maxLarg;
+    comp  = maxComp;
+  } else {
+    // ===== AUTO (camadas) =====
+    // 1) base "ideal" pelo total de áreas
+    const squareSide = Math.ceil(Math.sqrt(sumBaseArea));
+    let idealAlt = Math.max(squareSide, maxAlt);
+    let idealLarg = Math.max(squareSide, maxLarg);
+
+    // 2) limite prático de espalhamento da base
+    const capAlt = Math.ceil(maxAlt * BASE_FACTOR);
+    const capLarg = Math.ceil(maxLarg * BASE_FACTOR);
+
+    alt = Math.min(Math.ceil(idealAlt), capAlt);
+    larg = Math.min(Math.ceil(idealLarg), capLarg);
+
+    // 3) capacidade por camada usando "células" do maior item
+    const cellsX = Math.max(1, Math.floor(alt / maxAlt));
+    const cellsY = Math.max(1, Math.floor(larg / maxLarg));
+    const porCamada = Math.max(1, cellsX * cellsY);
+
+    // 4) camadas necessárias e comprimento total
+    const camadas = Math.ceil(unidades / porCamada);
+    comp = camadas * maxComp;
+
+    // Se por algum motivo o volume base ainda ficou insuficiente (itens muito diferentes), garante camadas pelo volume
+    const volBase = alt * larg * maxComp;
+    if (volBase > 0) {
+      const camadasVol = Math.ceil(volTotal / volBase);
+      comp = Math.max(comp, camadasVol * maxComp);
+    }
+  }
+
+  // Folgas e arredondamentos
+  alt = Math.ceil(alt + margin);
+  larg = Math.ceil(larg + margin);
+  comp  = Math.ceil(comp  + margin);
+
+  const cubado    = (alt * larg * comp) / FATOR_CUBAGEM;
+  const pesoTotal = selected.reduce((s,it)=>s + (it.peso||0)*(it.qty||0), 0);
+
+  return { alt, larg, comp, cubado, pesoTotal, unidades };
+}
+
+/* ===== Seleção + Resumo ===== */
+function updateSummary(){
+  const sel=getSelectedWithQty();
+  const est=estimateBox(sel);
+  $('#resCount').textContent=est.unidades+' un.';
+  $('#resPeso').textContent=fmtKG(est.pesoTotal);
+  $('#resAlt').textContent=est.alt? (est.alt+' cm') : '–';
+  $('#resLarg').textContent=est.larg? (est.larg+' cm') : '–';
+  $('#resComp').textContent =est.comp ? (est.comp +' cm') : '–';
+  $('#resCubado').textContent=fmtKG(est.cubado);
+}
+function clearCurrentSimulation(){
+  selectedIds.clear();
+  qtyMap.clear();
+  renderTable();
+}
+
+/* ===== Resumo em texto ===== */
+function buildSummaryText(name=''){
+  const sel=getSelectedWithQty();
+  const est=estimateBox(sel);
+  const modeLabel={auto:'Auto (camadas)',stack:'Empilhar',side:'Lado a lado'}[$('#packMode').value];
+  const margin=Number($('#margin').value)||0;
+  const itensTxt=sel.length
+    ? sel.map(it=>`- ${it.nome} — ${it.peso} kg — ${it.alt}×${it.larg}×${it.comp} cm — Qtd: ${it.qty}`).join('\n')
+    : '(nenhum item selecionado)';
+  return [
+    name ? `Cotação: ${name}` : 'Cotação',
+    `Itens (${est.unidades} un.):`,
+    itensTxt,
+    `\nPeso total: ${est.pesoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    `Caixa estimada: ${est.alt}×${est.larg}×${est.comp} cm`,
+    `Peso cubado: ${est.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    `Empacotamento: ${modeLabel} | Folga: ${margin} cm`,
+    `Data: ${new Date().toLocaleString('pt-BR')}`
+  ].join('\n');
+}
+async function copySummary(){
+  const text=buildSummaryText();
+  try{ await navigator.clipboard.writeText(text); alert('Resumo copiado!'); }
+  catch(_){
+    const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove(); alert('Resumo copiado (fallback)!');
+  }
+}
+
+/* ===== Cotações (apenas 10) ===== */
+function saveSimulation(name){
+  const sel=getSelectedWithQty();
+  if(!sel.length){ alert('Selecione ao menos um item.'); return; }
+  name=(name||'').trim() || `Simulação ${new Date().toLocaleDateString('pt-BR')}`;
+  const est=estimateBox(sel);
+  const sim={
+    id:uid(),
+    name,
+    dateISO:new Date().toISOString(),
+    packMode:$('#packMode').value,
+    margin:Number($('#margin').value)||0,
+    selected: sel.map(it=>({id:it.id, qty:it.qty})),
+    snapshot: sel.map(it=>({nome:it.nome,qty:it.qty,peso:it.peso,alt:it.alt,larg:it.larg,comp:it.comp})),
+    summary:{units:est.unidades,peso:est.pesoTotal,alt:est.alt,larg:est.larg,comp:est.comp,cubado:est.cubado}
+  };
+  simsMain.push(sim);
+  simsMain.sort((a,b)=>new Date(b.dateISO)-new Date(a.dateISO));
+  if(simsMain.length>10){ simsMain=simsMain.slice(0,10); }
+  saveSims(); renderSims();
+  openSimDetails(sim.id, true); // abre os itens da cotação recém salva
+  alert('Cotação salva!');
+}
+function renderSims(){
+  const tbody=$('#tbodyMain'); tbody.innerHTML='';
+  simsMain.forEach(sim=>{
+    // linha principal
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${sim.name}</td>
+      <td>${(sim.summary.units||0)}</td>
+      <td>${sim.summary.peso.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg</td>
+      <td>${sim.summary.alt}×${sim.summary.larg}×${sim.summary.comp} cm</td>
+      <td>${fmtDate(sim.dateISO)}</td>
+      <td class="right">
+        <button class="btn ghost simToggle" data-id="${sim.id}">Ver itens</button>
+        <button class="btn ghost simApply"  data-id="${sim.id}">Aplicar</button>
+        <button class="btn ghost simCopy"   data-id="${sim.id}">Copiar</button>
+        <button class="btn red   simDel"    data-id="${sim.id}">Excluir</button>
+      </td>`;
+    tbody.appendChild(tr);
+    // linha de detalhes (itens)
+    const trd=document.createElement('tr');
+    trd.className='sim-detail';
+    trd.id=`detail-${sim.id}`;
+    trd.style.display='none';
+    const itensTxt=(sim.snapshot||[]).map(s=>`• ${s.nome}  —  Qtd: ${s.qty}  —  ${s.peso} kg  —  ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
+    trd.innerHTML=`<td colspan="6"><pre>${itensTxt || '—'}</pre></td>`;
+    tbody.appendChild(trd);
+  });
+  // binds
+  $all('.simToggle').forEach(b=>b.addEventListener('click',()=>openSimDetails(b.dataset.id)));
+  $all('.simApply').forEach(b=>b.addEventListener('click',()=>applySim(b.dataset.id)));
+  $all('.simCopy').forEach(b =>b.addEventListener('click',()=>copySim(b.dataset.id)));
+  $all('.simDel').forEach(b  =>b.addEventListener('click',()=>delSim(b.dataset.id)));
+}
+function openSimDetails(id, forceOpen=false){
+  const row=document.getElementById(`detail-${id}`);
+  if(!row) return;
+  const btn=document.querySelector(`.simToggle[data-id="${id}"]`);
+  const isHidden=row.style.display==='none';
+  const willShow = forceOpen ? true : isHidden;
+  row.style.display = willShow ? '' : 'none';
+  if(btn) btn.textContent = willShow ? 'Ocultar itens' : 'Ver itens';
+}
+function findSim(id){ const idx=simsMain.findIndex(s=>s.id===id); return {idx, sim:simsMain[idx]}; }
+function applySim(id){
+  const {idx,sim}=findSim(id); if(idx<0) return;
+  $('#packMode').value=sim.packMode||'auto';
+  $('#margin').value=sim.margin||0;
+  selectedIds=new Set();
+  qtyMap=new Map();
+  if(sim.selected){ // versão nova com qty
+    sim.selected.forEach(s=>{ selectedIds.add(s.id); qtyMap.set(s.id, clampQty(s.qty||1)); });
+  }else{ // fallback (versões antigas)
+    (sim.selectedIds||[]).forEach(id=>selectedIds.add(id));
+    (sim.snapshot||[]).forEach(s=>{
+      const it=items.find(x=>x.nome===s.nome);
+      if(it){ selectedIds.add(it.id); qtyMap.set(it.id, clampQty(s.qty||1)); }
+    });
+  }
+  renderTable(); alert('Simulação aplicada.');
+}
+async function copySim(id){
+  const {idx,sim}=findSim(id); if(idx<0) return;
+  const itensTxt=(sim.snapshot||[]).map(s=>`- ${s.nome} — Qtd: ${s.qty} — ${s.peso} kg — ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
+  const body=[
+    `Cotação: ${sim.name}`,
+    `Itens (${sim.summary.units||0} un.):`,
+    itensTxt||'(snapshot não disponível)',
+    `\nPeso total: ${sim.summary.peso.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    `Caixa estimada: ${sim.summary.alt}×${sim.summary.larg}×${sim.summary.comp} cm`,
+    `Peso cubado: ${sim.summary.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    `Empacotamento: ${sim.packMode} | Folga: ${sim.margin} cm`,
+    `Data: ${fmtDate(sim.dateISO)}`
+  ].join('\n');
+  try{ await navigator.clipboard.writeText(body); alert('Resumo da simulação copiado!'); }
+  catch(_){ const ta=document.createElement('textarea'); ta.value=body; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); alert('Resumo copiado (fallback)!'); }
+}
+function delSim(id){
+  if(!confirm('Excluir esta simulação?')) return;
+  const {idx}=findSim(id); if(idx<0) return;
+  simsMain.splice(idx,1); saveSims(); renderSims();
+}
+
+/* ===== Eventos ===== */
+$('#btnAdd').addEventListener('click', openNew);
+$('#btnClear').addEventListener('click', ()=>{
+  if(!confirm('Apagar TODOS os itens?')) return;
+  items=[]; selectedIds.clear(); qtyMap.clear(); saveItems(); renderTable(); updateCountInfo();
+});
+$('#txtSearch').addEventListener('input', ()=>{currentPage=1; renderTable();});
+$('#chkAll').addEventListener('change', (e)=>{
+  $all('.rowchk').forEach(chk => {
+    chk.checked = e.target.checked;
+    const id=chk.dataset.id;
+    const qtyInp=document.querySelector(`.qty[data-id="${id}"]`);
+    if(e.target.checked){
+      selectedIds.add(id);
+      if(!qtyMap.has(id)) qtyMap.set(id,1);
+      qtyInp.disabled=false; if(!qtyInp.value) qtyInp.value=1;
+    }else{
+      selectedIds.delete(id);
+      qtyInp.disabled=true;
+    }
+  });
+  updateSummary();
+});
+$('#btnPrev').addEventListener('click', ()=>{ if(currentPage>1){currentPage--; renderTable();} });
+$('#btnNext').addEventListener('click', ()=>{ currentPage++; renderTable(); });
+$('#packMode').addEventListener('change', updateSummary);
+$('#margin').addEventListener('input', updateSummary);
+$('#btnCopy').addEventListener('click', copySummary);
+$('#btnSaveSim').addEventListener('click', ()=>{
+  if(!getSelectedWithQty().length){ alert('Selecione ao menos um item.'); return; }
+  $('#simName').value=''; $('#dlgSim').showModal();
+});
+$('#dlgSimClose').addEventListener('click', ()=>$('#dlgSim').close());
+$('#dlgSimSave').addEventListener('click', ()=>{ saveSimulation($('#simName').value); $('#dlgSim').close(); });
+$('#btnClearSim').addEventListener('click', clearCurrentSimulation);
+
+/* Abas */
+$all('#catTabs .tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $all('#catTabs .tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCat=btn.dataset.cat; currentPage=1; renderTable(); updateCountInfo();
+  });
+});
+
+/* Modal */
+$('#dlgClose').addEventListener('click', ()=>$('#dlg').close());
+$('#dlgSave').addEventListener('click', saveFromModal);
+$('#dlgDelete').addEventListener('click', deleteFromModal);
+</script>
+</body>
+</html>
