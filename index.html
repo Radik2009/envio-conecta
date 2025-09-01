@@ -53,11 +53,20 @@
   .sim-detail{background:#0c1912}
   .sim-detail pre{white-space:pre-wrap;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfe9d7}
   /* Modal */
-  dialog{border:none;border-radius:16px;background:#0d1812;color:#e8f6ec;padding:16px;max-width:560px;width:92%}
+  dialog{border:none;border-radius:16px;background:#0d1812;color:#e8f6ec;padding:16px;max-width:650px;width:92%}
   dialog::backdrop{background:rgba(0,0,0,.5)}
   .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
   .modal-body{display:grid;gap:10px}
   .hint{font-size:12px;color:var(--muted)}
+  /* Fotos (Periféricos) */
+  .foto-section{border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+  .thumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .thumb{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#0c1912}
+  .thumb img{display:block;width:100%;height:74px;object-fit:cover}
+  .thumb button{position:absolute;top:4px;right:4px;border:none;border-radius:8px;padding:4px 6px;background:#b63a3a;color:#fff;cursor:pointer}
+  /* Aviso de caixa */
+  .warn{margin-top:12px;padding:10px;border:1px solid #6b1f1f;background:#170f10;border-radius:10px}
+  .warn b{color:#ffd1d1}
 </style>
 </head>
 <body>
@@ -80,12 +89,13 @@
           <button class="tab" data-cat="impressora">[impressora]</button>
           <button class="tab" data-cat="monitor">[monitor]</button>
           <button class="tab" data-cat="perifericos">[perifericos]</button>
+          <button class="tab" data-cat="caixa">[caixa]</button>
         </div>
 
         <div class="toolbar">
           <button class="btn" id="btnAdd">Adicionar item</button>
           <button class="btn red" id="btnClear" title="Apagar todos os itens">Limpar itens</button>
-          <input class="search" id="txtSearch" placeholder="Buscar por nome (ex.: hp 840 g8, brother 2540, monitor)">
+          <input class="search" id="txtSearch" placeholder="Buscar por nome (ex.: hp 840 g8, brother 2540, caixa 30x30x30)">
           <span class="muted" id="countInfo"></span>
         </div>
 
@@ -121,13 +131,13 @@
             <label class="muted">Modo de empacotamento</label>
             <select id="packMode" title="Como estimar a caixa combinada">
               <option value="stack" selected>Empilhar (altura soma)</option>
-              <option value="auto">Auto (base quadrada)</option>
+              <option value="auto">Auto (camadas)</option>
               <option value="side">Lado a lado (comprimento soma)</option>
             </select>
           </div>
           <div class="col-3">
             <label class="muted">Folga interna (cm)</label>
-            <input type="number" id="margin" step="1" min="0" value="3" title="Folga adicionada a cada dimensão">
+            <input type="number" id="margin" step="1" min="0" value="3" title="Folga adicionada a cada dimensão (estimativa)">
           </div>
           <div class="col-6" style="display:flex;gap:10px;align-items:center">
             <button class="btn" id="btnCopy">Copiar resumo</button>
@@ -139,15 +149,16 @@
       <!-- Resumo -->
       <div class="section">
         <div class="totbox">
-          <div class="tot"><b>Itens selecionados</b><span id="resCount">0 un.</span></div>
-          <div class="tot"><b>Peso total real</b><span id="resPeso">0,00 kg</span></div>
+          <div class="tot"><b>Itens selecionados (equip.)</b><span id="resCount">0 un.</span></div>
+          <div class="tot"><b>Peso total real (equip.)</b><span id="resPeso">0,00 kg</span></div>
           <div class="tot"><b>Peso cubado</b><span id="resCubado">0,00 kg</span></div>
         </div>
         <div class="totbox" style="margin-top:12px">
-          <div class="tot"><b>Altura estimada</b><span id="resAlt">–</span></div>
-          <div class="tot"><b>Largura estimada</b><span id="resLarg">–</span></div>
-          <div class="tot"><b>Comprimento estimado</b><span id="resComp">–</span></div>
+          <div class="tot"><b>Altura estimada/caixa</b><span id="resAlt">–</span></div>
+          <div class="tot"><b>Largura estimada/caixa</b><span id="resLarg">–</span></div>
+          <div class="tot"><b>Comprimento estimado/caixa</b><span id="resComp">–</span></div>
         </div>
+        <div id="boxWarn" class="warn" style="display:none"></div>
         <div class="toolbar" style="margin-top:12px">
           <button class="btn" id="btnSaveSim">Salvar cotação</button>
           <button class="btn ghost" id="btnClearSim" title="Limpar seleção e resumo">Limpar simulação</button>
@@ -191,7 +202,16 @@
       <div class="col-2"><input id="fComp"  type="number" step="0.1" min="0" placeholder="Comprimento (cm)"></div>
       <div class="col-6"><span class="hint">O item será salvo na sessão atual <b id="dlgSessaoAtual">[geral]</b>.</span></div>
     </div>
-    <div class="grid">
+
+    <!-- Seção de fotos (apenas para periféricos) -->
+    <div id="fotoSection" class="foto-section" style="display:none">
+      <b style="display:block;margin-bottom:6px">Fotos (apenas para [perifericos])</b>
+      <input id="fFotos" type="file" accept="image/*" multiple>
+      <span class="hint">As imagens são reduzidas para economizar espaço (salvas no navegador).</span>
+      <div class="thumbs" id="fotoGrid" style="margin-top:8px"></div>
+    </div>
+
+    <div class="grid" style="margin-top:4px">
       <div class="col-6" style="display:flex;gap:10px;align-items:center">
         <button class="btn" id="dlgSave">Salvar</button>
         <button class="btn red" id="dlgDelete" style="display:none">Excluir</button>
@@ -223,8 +243,8 @@ const fmtKG=n=>(Number(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,ma
 const fmtDate=iso=>new Date(iso).toLocaleString('pt-BR');
 const clampQty=v=>Math.max(1,Math.floor(Number(v)||1)); // quantidade
 const clampNonNeg=v=>Math.max(0,Number(v)||0); // peso e dimensões
-const LS_KEY_ITEMS='ri_items_v6';
-const LS_KEY_S1='ri_sims_main_v4';
+const LS_KEY_ITEMS='ri_items_v7';
+const LS_KEY_S1='ri_sims_main_v5';
 function uid(){return Math.random().toString(36).slice(2,9)}
 
 /* ===== Estado ===== */
@@ -238,23 +258,45 @@ const perPage=10;
 let selectedIds=new Set();
 let qtyMap=new Map(); // {id -> qtd}
 
+let dlgFotosTemp=[]; // buffer de fotos do modal
+
 renderTable(); renderSims(); updateCountInfo();
 
 /* ===== Seeds ===== */
 function seedItems(){
   return [
     {id:uid(),cat:'impressora',nome:'Brother DCP-L2540DW',peso:11.1,alt:31.6,larg:39.8,comp:40.9},
-    {id:uid(),cat:'impressora',nome:'Brother DCP-L5652DN',peso:17.1,alt:48.6,larg:42.7,comp:49.5},
+    {id:uid(),cat:'impressora',nome:'Brother DCP-L5652DN',peso:17.1,alt:60.0,larg:60.0,comp:52.5},
     {id:uid(),cat:'impressora',nome:'Brother MFC-L8900CDW',peso:28.6,alt:54.9,larg:52.6,comp:49.5},
-    {id:uid(),cat:'impressora',nome:'Epson EcoTank L14150',peso:9.7,alt:24.5,larg:35.8,comp:49.8},
-    {id:uid(),cat:'monitor',nome:'Dell P2012H (com base)',peso:2.88,alt:40.12,larg:18.33,comp:47.84},
-    {id:uid(),cat:'note',nome:'HP EliteBook 840 G8',peso:1.32,alt:1.79,larg:21.46,comp:32.34},
-    {id:uid(),cat:'geral',nome:'All in One Positivo U1500',peso:4.14,alt:34.2,larg:45.5,comp:39}
+    {id:uid(),cat:'impressora',nome:'Epson L14150',peso:9.7,alt:25.9,larg:50.6,comp:36.5},
+    {id:uid(),cat:'monitor',nome:'Monitor Diversos (com base)',peso:2.88,alt:30.12,larg:50.33,comp:2.0},
+    {id:uid(),cat:'note',nome:'Notebook 15',peso:1.32,alt:3.0,larg:36.0,comp:25.0},
+    {id:uid(),cat:'note',nome:'Notebook 14',peso:1.60,alt:3.0,larg:34.0,comp:23.0},
+    {id:uid(),cat:'geral',nome:'All in One Positivo U1500',peso:4.14,alt:34.2,larg:45.5,comp:3.9},
+    {id:uid(),cat:'perifericos',nome:'Modem',peso:0.99,alt:0.15,larg:0.15,comp:0.03},
+    // Caixa (exemplo do pedido)
+    {id:uid(),cat:'caixa',nome:'Caixa Brother 2540',peso:0,alt:42,larg:55,comp:51},
+    {id:uid(),cat:'caixa',nome:'Caixa Brother 5652',peso:0,alt:60,larg:60,comp:60},
+    {id:uid(),cat:'caixa',nome:'Caixa Notebook',peso:0,alt:7,larg:45,comp:35}
   ];
 }
 
 /* ===== Storage ===== */
-function loadItems(){ const raw=localStorage.getItem(LS_KEY_ITEMS); if(raw){try{return JSON.parse(raw);}catch(e){}} return seedItems(); }
+function loadItems(){
+  const keysTry=['ri_items_v7','ri_items_v6'];
+  for(const k of keysTry){
+    const raw=localStorage.getItem(k);
+    if(raw){ try{
+      let arr=JSON.parse(raw);
+      // garantia de campos
+      arr=arr.map(it=>({fotos:[],...it}));
+      // migração: mover para nova key
+      if(k!=='ri_items_v7') localStorage.setItem('ri_items_v7',JSON.stringify(arr));
+      return arr;
+    }catch(e){} }
+  }
+  return seedItems();
+}
 function saveItems(){ localStorage.setItem(LS_KEY_ITEMS,JSON.stringify(items)); }
 function loadSims(key){ const raw=localStorage.getItem(key); if(raw){try{return JSON.parse(raw);}catch(e){}} return []; }
 function saveSims(){ localStorage.setItem(LS_KEY_S1,JSON.stringify(simsMain)); }
@@ -292,19 +334,24 @@ function renderTable(){
     const tr=document.createElement('tr');
     const checked=selectedIds.has(it.id);
     const qval = qtyMap.get(it.id) || 1;
+    const fotoCount = (it.fotos && it.fotos.length) ? it.fotos.length : 0;
     tr.innerHTML=`
       <td><input type="checkbox" class="rowchk" data-id="${it.id}" ${checked?'checked':''}></td>
-      <td>${it.nome}</td>
+      <td>${it.nome}${it.cat==='perifericos' && fotoCount? ` <span class="muted">[📷 ${fotoCount}]</span>`:''}</td>
       <td class="right">${(it.peso||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
       <td class="right">${it.alt||0}</td>
       <td class="right">${it.larg||0}</td>
       <td class="right">${it.comp||0}</td>
       <td class="right"><input type="number" min="1" step="1" class="qty" data-id="${it.id}" value="${qval}" ${checked?'':'disabled'} title="Quantidade"></td>
-      <td class="right"><button class="btn ghost btnEdit" data-id="${it.id}">Editar</button></td>
+      <td class="right">
+        <button class="btn ghost btnEdit" data-id="${it.id}">Editar</button>
+        ${it.cat==='perifericos' ? `<button class="btn ghost btnPhotos" data-id="${it.id}">Fotos (${fotoCount})</button>`:''}
+      </td>
     `;
     tbody.appendChild(tr);
   });
   $all('.btnEdit').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.id)));
+  $all('.btnPhotos').forEach(b=>b.addEventListener('click',()=>openEdit(b.dataset.id,true)));
   $all('.rowchk').forEach(chk=>{
     chk.addEventListener('change',e=>{
       const id=e.target.dataset.id;
@@ -334,6 +381,37 @@ function renderTable(){
 }
 
 /* ===== Modal Add/Edit ===== */
+function setFotoSectionVisible(v){ $('#fotoSection').style.display = v ? '' : 'none'; }
+function renderFotoGrid(){
+  const grid=$('#fotoGrid'); grid.innerHTML='';
+  dlgFotosTemp.forEach((src,idx)=>{
+    const d=document.createElement('div');
+    d.className='thumb';
+    d.innerHTML=`<img src="${src}"/><button title="Remover" data-idx="${idx}">×</button>`;
+    grid.appendChild(d);
+  });
+  grid.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const i=Number(btn.dataset.idx);
+      dlgFotosTemp.splice(i,1);
+      renderFotoGrid();
+    });
+  });
+}
+async function resizeImage(file, maxDim=1280, quality=0.8){
+  const img=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+  const el=new Image();
+  el.src=img;
+  await new Promise(r=>{ el.onload=r; el.onerror=r; });
+  const {width:W,height:H}=el;
+  let w=W,h=H;
+  if (W>H && W>maxDim){ w=maxDim; h=Math.round(H*(maxDim/W)); }
+  else if (H>=W && H>maxDim){ h=maxDim; w=Math.round(W*(maxDim/H)); }
+  const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d'); ctx.drawImage(el,0,0,w,h);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
 function openNew(){
   editingId=null;
   $('#dlgTitle').textContent='Novo item';
@@ -341,18 +419,27 @@ function openNew(){
   $('#fAlt').value=''; $('#fLarg').value=''; $('#fComp').value='';
   $('#dlgDelete').style.display='none'; $('#dlgHint').textContent='';
   $('#dlgSessaoAtual').textContent=`[${currentCat}]`;
+  dlgFotosTemp=[];
+  setFotoSectionVisible(currentCat==='perifericos');
+  renderFotoGrid();
   $('#dlg').showModal();
 }
-function openEdit(id){
+function openEdit(id, gotoFotos=false){
   const it=items.find(x=>x.id===id); if(!it) return;
   editingId=id;
   $('#dlgTitle').textContent='Editar item';
   $('#fNome').value=it.nome; $('#fPeso').value=it.peso;
   $('#fAlt').value=it.alt; $('#fLarg').value=it.larg; $('#fComp').value=it.comp;
   $('#dlgDelete').style.display='inline-block';
-  $('#dlgHint').textContent=`ID: ${id} • sessão interna: [${it.cat}]`;
+  $('#dlgHint').textContent=`ID: ${id} • sessão: [${it.cat}]`;
   $('#dlgSessaoAtual').textContent=`[${it.cat}]`;
+  dlgFotosTemp=Array.isArray(it.fotos)? [...it.fotos]:[];
+  setFotoSectionVisible(it.cat==='perifericos');
+  renderFotoGrid();
   $('#dlg').showModal();
+  if(gotoFotos && it.cat==='perifericos'){
+    setTimeout(()=>$('#fotoSection').scrollIntoView({behavior:'smooth'}),50);
+  }
 }
 function saveFromModal(){
   const nome=($('#fNome').value||'').trim();
@@ -361,12 +448,17 @@ function saveFromModal(){
   const larg=clampNonNeg($('#fLarg').value);
   const comp=clampNonNeg($('#fComp').value);
   if(!nome){alert('Informe um nome.');return}
-  const cat=currentCat || 'geral';
   if(editingId){
     const i=items.findIndex(x=>x.id===editingId);
-    if(i>=0) items[i]={id:editingId,cat,nome,peso,alt,larg,comp};
+    if(i>=0){
+      const keepCat=items[i].cat; // preserva categoria ao editar
+      const fotos = items[i].cat==='perifericos' ? dlgFotosTemp : (items[i].fotos||[]);
+      items[i]={id:editingId,cat:keepCat,nome,peso,alt,larg,comp,fotos};
+    }
   }else{
-    items.unshift({id:uid(),cat,nome,peso,alt,larg,comp});
+    const cat=currentCat || 'geral';
+    const fotos = cat==='perifericos' ? dlgFotosTemp : [];
+    items.unshift({id:uid(),cat,nome,peso,alt,larg,comp,fotos});
   }
   saveItems(); updateCountInfo(); $('#dlg').close(); renderTable();
 }
@@ -379,9 +471,20 @@ function deleteFromModal(){
   saveItems(); updateCountInfo(); $('#dlg').close(); renderTable();
 }
 
-/* ===== Estimativa de caixa ===== */
+/* Eventos de fotos */
+$('#fFotos').addEventListener('change', async (e)=>{
+  const files=[...e.target.files].slice(0,30); // limite de segurança
+  for(const f of files){
+    try{ const dataUrl=await resizeImage(f,1280,0.8); dlgFotosTemp.push(dataUrl); }
+    catch(_){ /* ignora arquivo problemático */ }
+  }
+  renderFotoGrid();
+  e.target.value='';
+});
+
+/* ===== Estimativa e caixas ===== */
 const FATOR_CUBAGEM = 6000;
-const BASE_FACTOR   = 2; // até 2x o maior item antes de começar a empilhar mais
+const BASE_FACTOR   = 2; // até 2x o maior item antes de "espalhar" mais
 
 function getSelectedWithQty(){
   const arr=[];
@@ -392,87 +495,148 @@ function getSelectedWithQty(){
   return arr;
 }
 
-function estimateBox(selected){ // selected: [{alt, larg, comp, peso, qty}]
-  if(!selected.length) return {alt:0, larg:0, comp:0, cubado:0, pesoTotal:0, unidades:0};
-
+function estimateBox(selectedAll){ // retorna métricas considerando modo "caixa" quando houver
   const margin = Number($('#margin').value) || 0;
   const mode   = $('#packMode').value;
 
-  const unidades = selected.reduce((s,it)=>s + (it.qty||0), 0);
+  const boxes = selectedAll.filter(it=>it.cat==='caixa');
+  const equip = selectedAll.filter(it=>it.cat!=='caixa');
 
-  const maxAlt = Math.max(...selected.map(it=>it.alt||0));
-  const maxLarg = Math.max(...selected.map(it=>it.larg||0));
-  const maxComp  = Math.max(...selected.map(it=>it.comp ||0));
+  const unidadesEquip = equip.reduce((s,it)=>s + (it.qty||0), 0);
+  const pesoEquip     = equip.reduce((s,it)=>s + (it.peso||0)*(it.qty||0), 0);
+  const volEquip      = equip.reduce((s,it)=>s + (it.alt||0)*(it.larg||0)*(it.comp||0)*(it.qty||0), 0);
 
-  const sumAlt = selected.reduce((s,it)=>s + (it.alt||0)*(it.qty||0), 0);
-  const sumLarg = selected.reduce((s,it)=>s + (it.larg||0)*(it.qty||0), 0);
-  const sumComp  = selected.reduce((s,it)=>s + (it.comp ||0)*(it.qty||0), 0);
+  if(boxes.length>0){
+    // capacidade e cubagem somadas por caixas
+    let capacity=0, cubado=0;
+    const boxTypes = boxes.map(b=>{
+      const volUnit = (b.alt||0)*(b.larg||0)*(b.comp||0);
+      capacity += volUnit*(b.qty||0);
+      cubado   += (volUnit / FATOR_CUBAGEM) * (b.qty||0);
+      return {id:b.id,nome:b.nome,qty:b.qty,alt:b.alt,larg:b.larg,comp:b.comp,volUnit};
+    });
+    const overflow = volEquip > capacity;
+    let suggest=null;
+    if(overflow && boxTypes.length===1){
+      const bt=boxTypes[0];
+      const needed = Math.max(0, Math.ceil(volEquip / bt.volUnit) - (bt.qty||0));
+      if(needed>0) suggest = {boxId:bt.id, addQty:needed, boxName:bt.nome};
+    }
+    // Para exibição das dimensões: se uma única caixa, mostra; se múltiplas, deixa "–"
+    let alt=0, larg=0, comp=0;
+    if(boxTypes.length===1){
+      alt = Math.ceil(boxTypes[0].alt);
+      larg= Math.ceil(boxTypes[0].larg);
+      comp= Math.ceil(boxTypes[0].comp);
+    }
+    return {
+      usesBoxes:true, boxes:boxTypes, overflow, suggest,
+      alt,larg,comp, cubado, pesoTotal:pesoEquip, unidades:unidadesEquip,
+      volumeEq:volEquip, capacity
+    };
+  }
 
-  const volTotal    = selected.reduce((s,it)=>s + (it.alt||0)*(it.larg||0)*(it.comp||0)*(it.qty||0), 0);
-  const sumBaseArea = selected.reduce((s,it)=>s + (it.alt||0)*(it.larg||0)*(it.qty||0), 0);
+  // ===== Estimativa "normal" (sem caixas) sobre os equipamentos =====
+  if(!equip.length) return {alt:0,larg:0,comp:0,cubado:0,pesoTotal:0,unidades:0,usesBoxes:false,boxes:[]};
+
+  const maxAlt  = Math.max(...equip.map(it=>it.alt ||0));
+  const maxLarg = Math.max(...equip.map(it=>it.larg||0));
+  const maxComp = Math.max(...equip.map(it=>it.comp||0));
+
+  const sumAlt  = equip.reduce((s,it)=>s + (it.alt ||0)*(it.qty||0), 0);
+  const sumComp = equip.reduce((s,it)=>s + (it.comp||0)*(it.qty||0), 0);
+  const sumBaseArea = equip.reduce((s,it)=>s + (it.larg||0)*(it.comp||0)*(it.qty||0), 0);
 
   let alt, larg, comp;
 
   if (mode === 'stack') {
-    alt = maxAlt;
+    alt  = sumAlt;
     larg = maxLarg;
-    comp  = sumComp;
+    comp = maxComp;
   } else if (mode === 'side') {
-    alt = sumAlt;
+    alt  = maxAlt;
     larg = maxLarg;
-    comp  = maxComp;
+    comp = sumComp;
   } else {
-    // ===== AUTO (camadas) =====
-    // 1) base "ideal" pelo total de áreas
     const squareSide = Math.ceil(Math.sqrt(sumBaseArea));
-    let idealAlt = Math.max(squareSide, maxAlt);
     let idealLarg = Math.max(squareSide, maxLarg);
-
-    // 2) limite prático de espalhamento da base
-    const capAlt = Math.ceil(maxAlt * BASE_FACTOR);
+    let idealComp = Math.max(squareSide, maxComp);
     const capLarg = Math.ceil(maxLarg * BASE_FACTOR);
-
-    alt = Math.min(Math.ceil(idealAlt), capAlt);
+    const capComp = Math.ceil(maxComp * BASE_FACTOR);
     larg = Math.min(Math.ceil(idealLarg), capLarg);
-
-    // 3) capacidade por camada usando "células" do maior item
-    const cellsX = Math.max(1, Math.floor(alt / maxAlt));
-    const cellsY = Math.max(1, Math.floor(larg / maxLarg));
+    comp = Math.min(Math.ceil(idealComp), capComp);
+    const cellsX = Math.max(1, Math.floor(larg / maxLarg));
+    const cellsY = Math.max(1, Math.floor(comp / maxComp));
     const porCamada = Math.max(1, cellsX * cellsY);
-
-    // 4) camadas necessárias e comprimento total
-    const camadas = Math.ceil(unidades / porCamada);
-    comp = camadas * maxComp;
-
-    // Se por algum motivo o volume base ainda ficou insuficiente (itens muito diferentes), garante camadas pelo volume
-    const volBase = alt * larg * maxComp;
-    if (volBase > 0) {
-      const camadasVol = Math.ceil(volTotal / volBase);
-      comp = Math.max(comp, camadasVol * maxComp);
+    const camadas = Math.ceil(unidadesEquip / porCamada);
+    alt = camadas * maxAlt;
+    const volBasePorCamada = larg * comp * maxAlt;
+    if (volBasePorCamada > 0) {
+      const camadasVol = Math.ceil(volEquip / volBasePorCamada);
+      alt = Math.max(alt, camadasVol * maxAlt);
     }
   }
 
-  // Folgas e arredondamentos
-  alt = Math.ceil(alt + margin);
+  alt  = Math.ceil(alt  + margin);
   larg = Math.ceil(larg + margin);
-  comp  = Math.ceil(comp  + margin);
-
+  comp = Math.ceil(comp + margin);
   const cubado    = (alt * larg * comp) / FATOR_CUBAGEM;
-  const pesoTotal = selected.reduce((s,it)=>s + (it.peso||0)*(it.qty||0), 0);
 
-  return { alt, larg, comp, cubado, pesoTotal, unidades };
+  return { alt, larg, comp, cubado, pesoTotal:pesoEquip, unidades:unidadesEquip, usesBoxes:false, boxes:[] };
 }
 
 /* ===== Seleção + Resumo ===== */
 function updateSummary(){
   const sel=getSelectedWithQty();
   const est=estimateBox(sel);
+
+  // contagem/peso só de equipamentos
   $('#resCount').textContent=est.unidades+' un.';
   $('#resPeso').textContent=fmtKG(est.pesoTotal);
-  $('#resAlt').textContent=est.alt? (est.alt+' cm') : '–';
-  $('#resLarg').textContent=est.larg? (est.larg+' cm') : '–';
-  $('#resComp').textContent =est.comp ? (est.comp +' cm') : '–';
+
+  // dimensões exibidas
+  $('#resAlt').textContent = est.alt ? (est.alt+' cm') : '–';
+  $('#resLarg').textContent= est.larg? (est.larg+' cm') : '–';
+  $('#resComp').textContent= est.comp? (est.comp+' cm') : '–';
+
   $('#resCubado').textContent=fmtKG(est.cubado);
+
+  // aviso / sugestão de caixa
+  const warn=$('#boxWarn');
+  if(est.usesBoxes){
+    if(est.overflow){
+      let html = `<b>Caixa não compatível com a quantidade de equipamentos.</b><br>
+                  Volume dos equipamentos: ${(est.volumeEq/1000).toFixed(0)} L • Capacidade das caixas: ${(est.capacity/1000).toFixed(0)} L.`;
+      if(est.suggest){
+        html += `<div style="margin-top:8px">
+          <button class="btn" id="btnSuggestAddBox" data-box="${est.suggest.boxId}" data-add="${est.suggest.addQty}">
+            Adicionar ${est.suggest.addQty} caixa(s)
+          </button>
+          <span class="hint" style="margin-left:8px">Caixa: ${est.suggest.boxName}</span>
+        </div>`;
+      }else{
+        html += `<div class="hint" style="margin-top:6px">Ajuste manualmente as quantidades de caixas.</div>`;
+      }
+      warn.innerHTML=html;
+      warn.style.display='';
+      const btn=$("#btnSuggestAddBox");
+      if(btn){
+        btn.onclick=()=>{
+          const id=btn.dataset.box;
+          const add=Number(btn.dataset.add||0);
+          const cur=(qtyMap.get(id)||1);
+          qtyMap.set(id, cur+add);
+          renderTable();
+        };
+      }
+    }else{
+      warn.style.display='none';
+      warn.innerHTML='';
+    }
+  }else{
+    warn.style.display='none';
+    warn.innerHTML='';
+  }
 }
 function clearCurrentSimulation(){
   selectedIds.clear();
@@ -486,17 +650,28 @@ function buildSummaryText(name=''){
   const est=estimateBox(sel);
   const modeLabel={auto:'Auto (camadas)',stack:'Empilhar',side:'Lado a lado'}[$('#packMode').value];
   const margin=Number($('#margin').value)||0;
-  const itensTxt=sel.length
-    ? sel.map(it=>`- ${it.nome} — ${it.peso} kg — ${it.alt}×${it.larg}×${it.comp} cm — Qtd: ${it.qty}`).join('\n')
-    : '(nenhum item selecionado)';
+
+  const itensEquip = sel.filter(i=>i.cat!=='caixa');
+  const itensCaixa = sel.filter(i=>i.cat==='caixa');
+
+  const itensEquipTxt = itensEquip.length
+    ? itensEquip.map(it=>`- ${it.nome} — ${it.peso} kg — ${it.alt}×${it.larg}×${it.comp} cm — Qtd: ${it.qty}`).join('\n')
+    : '(nenhum equipamento selecionado)';
+
+  const caixasTxt = itensCaixa.length
+    ? '\nCaixas:\n' + itensCaixa.map(c=>`- ${c.nome} — ${c.alt}×${c.larg}×${c.comp} cm — Qtd: ${c.qty}`).join('\n')
+    : '';
+
   return [
     name ? `Cotação: ${name}` : 'Cotação',
-    `Itens (${est.unidades} un.):`,
-    itensTxt,
-    `\nPeso total: ${est.pesoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
-    `Caixa estimada: ${est.alt}×${est.larg}×${est.comp} cm`,
-    `Peso cubado: ${est.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
-    `Empacotamento: ${modeLabel} | Folga: ${margin} cm`,
+    `Itens de equipamento (${est.unidades} un.):`,
+    itensEquipTxt,
+    caixasTxt,
+    `\nPeso total (equip.): ${est.pesoTotal.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    est.usesBoxes
+      ? `Cubagem (soma das caixas): ${est.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`
+      : `Caixa estimada: ${est.alt}×${est.larg}×${est.comp} cm\nPeso cubado: ${est.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    !est.usesBoxes ? `Empacotamento: ${modeLabel} | Folga: ${margin} cm` : `Empacotamento: caixas definidas`,
     `Data: ${new Date().toLocaleString('pt-BR')}`
   ].join('\n');
 }
@@ -522,26 +697,33 @@ function saveSimulation(name){
     packMode:$('#packMode').value,
     margin:Number($('#margin').value)||0,
     selected: sel.map(it=>({id:it.id, qty:it.qty})),
-    snapshot: sel.map(it=>({nome:it.nome,qty:it.qty,peso:it.peso,alt:it.alt,larg:it.larg,comp:it.comp})),
-    summary:{units:est.unidades,peso:est.pesoTotal,alt:est.alt,larg:est.larg,comp:est.comp,cubado:est.cubado}
+    snapshot: sel.map(it=>({nome:it.nome,cat:it.cat,qty:it.qty,peso:it.peso,alt:it.alt,larg:it.larg,comp:it.comp})),
+    summary:{units:est.unidades,peso:est.pesoTotal,alt:est.alt,larg:est.larg,comp:est.comp,cubado:est.cubado,usesBoxes:est.usesBoxes},
+    boxes: est.boxes || []
   };
   simsMain.push(sim);
   simsMain.sort((a,b)=>new Date(b.dateISO)-new Date(a.dateISO));
   if(simsMain.length>10){ simsMain=simsMain.slice(0,10); }
   saveSims(); renderSims();
-  openSimDetails(sim.id, true); // abre os itens da cotação recém salva
+  openSimDetails(sim.id, true);
   alert('Cotação salva!');
 }
 function renderSims(){
   const tbody=$('#tbodyMain'); tbody.innerHTML='';
   simsMain.forEach(sim=>{
-    // linha principal
+    const temCaixa = Array.isArray(sim.boxes) && sim.boxes.length>0;
+    const caixaLabel = temCaixa
+      ? (sim.boxes.length===1
+          ? `${sim.boxes[0].alt}×${sim.boxes[0].larg}×${sim.boxes[0].comp} cm`
+          : `${sim.boxes.length} tipos`)
+      : `${sim.summary.alt}×${sim.summary.larg}×${sim.summary.comp} cm`;
+
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td>${sim.name}</td>
       <td>${(sim.summary.units||0)}</td>
       <td>${sim.summary.peso.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg</td>
-      <td>${sim.summary.alt}×${sim.summary.larg}×${sim.summary.comp} cm</td>
+      <td>${caixaLabel}</td>
       <td>${fmtDate(sim.dateISO)}</td>
       <td class="right">
         <button class="btn ghost simToggle" data-id="${sim.id}">Ver itens</button>
@@ -550,16 +732,15 @@ function renderSims(){
         <button class="btn red   simDel"    data-id="${sim.id}">Excluir</button>
       </td>`;
     tbody.appendChild(tr);
-    // linha de detalhes (itens)
+
     const trd=document.createElement('tr');
     trd.className='sim-detail';
     trd.id=`detail-${sim.id}`;
     trd.style.display='none';
-    const itensTxt=(sim.snapshot||[]).map(s=>`• ${s.nome}  —  Qtd: ${s.qty}  —  ${s.peso} kg  —  ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
+    const itensTxt=(sim.snapshot||[]).map(s=>`• [${s.cat}] ${s.nome}  —  Qtd: ${s.qty}  —  ${s.peso} kg  —  ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
     trd.innerHTML=`<td colspan="6"><pre>${itensTxt || '—'}</pre></td>`;
     tbody.appendChild(trd);
   });
-  // binds
   $all('.simToggle').forEach(b=>b.addEventListener('click',()=>openSimDetails(b.dataset.id)));
   $all('.simApply').forEach(b=>b.addEventListener('click',()=>applySim(b.dataset.id)));
   $all('.simCopy').forEach(b =>b.addEventListener('click',()=>copySim(b.dataset.id)));
@@ -581,9 +762,9 @@ function applySim(id){
   $('#margin').value=sim.margin||0;
   selectedIds=new Set();
   qtyMap=new Map();
-  if(sim.selected){ // versão nova com qty
+  if(sim.selected){
     sim.selected.forEach(s=>{ selectedIds.add(s.id); qtyMap.set(s.id, clampQty(s.qty||1)); });
-  }else{ // fallback (versões antigas)
+  }else{
     (sim.selectedIds||[]).forEach(id=>selectedIds.add(id));
     (sim.snapshot||[]).forEach(s=>{
       const it=items.find(x=>x.nome===s.nome);
@@ -594,15 +775,14 @@ function applySim(id){
 }
 async function copySim(id){
   const {idx,sim}=findSim(id); if(idx<0) return;
-  const itensTxt=(sim.snapshot||[]).map(s=>`- ${s.nome} — Qtd: ${s.qty} — ${s.peso} kg — ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
+  const itensTxt=(sim.snapshot||[]).map(s=>`- [${s.cat}] ${s.nome} — Qtd: ${s.qty} — ${s.peso} kg — ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
   const body=[
     `Cotação: ${sim.name}`,
-    `Itens (${sim.summary.units||0} un.):`,
+    `Itens (equip.: ${sim.summary.units||0} un.):`,
     itensTxt||'(snapshot não disponível)',
-    `\nPeso total: ${sim.summary.peso.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
-    `Caixa estimada: ${sim.summary.alt}×${sim.summary.larg}×${sim.summary.comp} cm`,
-    `Peso cubado: ${sim.summary.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
-    `Empacotamento: ${sim.packMode} | Folga: ${sim.margin} cm`,
+    `\nPeso total (equip.): ${sim.summary.peso.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    `Cubagem: ${sim.summary.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
+    `Empacotamento: ${sim.summary.usesBoxes ? 'caixas' : sim.packMode} | Folga: ${sim.margin} cm`,
     `Data: ${fmtDate(sim.dateISO)}`
   ].join('\n');
   try{ await navigator.clipboard.writeText(body); alert('Resumo da simulação copiado!'); }
