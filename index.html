@@ -245,6 +245,7 @@ const clampQty=v=>Math.max(1,Math.floor(Number(v)||1)); // quantidade
 const clampNonNeg=v=>Math.max(0,Number(v)||0); // peso e dimensões
 const LS_KEY_ITEMS='ri_items_v7';
 const LS_KEY_S1='ri_sims_main_v5';
+const LIMITE_PESO_CORREIOS = 30; // limite por volume dos Correios (kg)
 function uid(){return Math.random().toString(36).slice(2,9)}
 
 /* ===== Estado ===== */
@@ -265,7 +266,7 @@ renderTable(); renderSims(); updateCountInfo();
 /* ===== Seeds ===== */
 function seedItems(){
   return [
-    {id:uid(),cat:'impressora',nome:'Brother DCP-L2540DW',peso:11.1,alt:31.6,larg:39.8,comp:40.9},
+    {id:uid(),cat:'impressora',nome:'Brother DCP-L2540DW',peso:11.1,alt:35.6,larg:42.8,comp:42.9},
     {id:uid(),cat:'impressora',nome:'Brother DCP-L5652DN',peso:17.1,alt:60.0,larg:60.0,comp:52.5},
     {id:uid(),cat:'impressora',nome:'Brother MFC-L8900CDW',peso:28.6,alt:54.9,larg:52.6,comp:49.5},
     {id:uid(),cat:'impressora',nome:'Epson L14150',peso:9.7,alt:25.9,larg:50.6,comp:36.5},
@@ -273,11 +274,17 @@ function seedItems(){
     {id:uid(),cat:'note',nome:'Notebook 15',peso:1.90,alt:3.0,larg:36.0,comp:25.0},
     {id:uid(),cat:'note',nome:'Notebook 14',peso:1.90,alt:3.0,larg:34.0,comp:23.0},
     {id:uid(),cat:'geral',nome:'All in One Positivo U1500',peso:4.14,alt:34.2,larg:45.5,comp:3.9},
-    {id:uid(),cat:'perifericos',nome:'Modem',peso:0.99,alt:0.15,larg:0.15,comp:0.03},
+    {id:uid(),cat:'perifericos',nome:'Modem',peso:0.99,alt:15.0,larg:15.0,comp:3.00},
+    {id:uid(),cat:'perifericos',nome:'Mouse',peso:0.85,alt:4.0,larg:6.0,comp:12.0},
+    {id:uid(),cat:'perifericos',nome:'Toner 5652',peso:1.00,alt:7.0,larg:28.0,comp:16.0},
+    {id:uid(),cat:'perifericos',nome:'Toner 2540',peso:1.00,alt:4.0,larg:28.0,comp:12.0},
+    {id:uid(),cat:'perifericos',nome:'Fonte',peso:0.99,alt:3.0,larg:11.0,comp:5.0},
+    {id:uid(),cat:'perifericos',nome:'Transformador',peso:4.00,alt:13.00,larg:14.0,comp:10.0},    
     // Caixa (exemplo do pedido)
     {id:uid(),cat:'caixa',nome:'Caixa Brother 2540',peso:0,alt:42,larg:55,comp:51},
     {id:uid(),cat:'caixa',nome:'Caixa Brother 5652',peso:0,alt:60,larg:60,comp:60},
-    {id:uid(),cat:'caixa',nome:'Caixa Notebook',peso:0,alt:7,larg:45,comp:35}
+    {id:uid(),cat:'caixa',nome:'Caixa Notebook',peso:0,alt:7,larg:45,comp:35},
+    {id:uid(),cat:'caixa',nome:'Caixa Padrão',peso:0,alt:30,larg:30,comp:30}
   ];
 }
 
@@ -601,37 +608,53 @@ function updateSummary(){
 
   $('#resCubado').textContent=fmtKG(est.cubado);
 
-  // aviso / sugestão de caixa
+  // aviso / sugestão de caixa + limite de peso Correios
   const warn=$('#boxWarn');
+  let warnHtml = '';
+  let showWarn = false;
+
+  // (A) Avisos de caixa (já existentes)
   if(est.usesBoxes){
     if(est.overflow){
-      let html = `<b>Caixa não compatível com a quantidade de equipamentos.</b><br>
-                  Volume dos equipamentos: ${(est.volumeEq/1000).toFixed(0)} L • Capacidade das caixas: ${(est.capacity/1000).toFixed(0)} L.`;
+      showWarn = true;
+      warnHtml += `<b>Caixa não compatível com a quantidade de equipamentos.</b><br>
+        Volume dos equipamentos: ${(est.volumeEq/1000).toFixed(0)} L • Capacidade das caixas: ${(est.capacity/1000).toFixed(0)} L.`;
       if(est.suggest){
-        html += `<div style="margin-top:8px">
+        warnHtml += `<div style="margin-top:8px">
           <button class="btn" id="btnSuggestAddBox" data-box="${est.suggest.boxId}" data-add="${est.suggest.addQty}">
             Adicionar ${est.suggest.addQty} caixa(s)
           </button>
           <span class="hint" style="margin-left:8px">Caixa: ${est.suggest.boxName}</span>
         </div>`;
       }else{
-        html += `<div class="hint" style="margin-top:6px">Ajuste manualmente as quantidades de caixas.</div>`;
+        warnHtml += `<div class="hint" style="margin-top:6px">Ajuste manualmente as quantidades de caixas.</div>`;
       }
-      warn.innerHTML=html;
-      warn.style.display='';
-      const btn=$("#btnSuggestAddBox");
-      if(btn){
-        btn.onclick=()=>{
-          const id=btn.dataset.box;
-          const add=Number(btn.dataset.add||0);
-          const cur=(qtyMap.get(id)||1);
-          qtyMap.set(id, cur+add);
-          renderTable();
-        };
-      }
-    }else{
-      warn.style.display='none';
-      warn.innerHTML='';
+    }
+  }
+
+  // (B) NOVO: Limite de peso dos Correios (30 kg por volume)
+  // Considera a regra prática de tarifação: o maior entre peso real e cubado.
+  const pesoTarifado = Math.max(est.pesoTotal || 0, est.cubado || 0);
+  if ((est.pesoTotal || 0) > LIMITE_PESO_CORREIOS){
+  const msg = `Peso superior ao limite dos correrios, cotação deve ser feito pela JEM`;
+  showWarn = true;
+  if (warnHtml) warnHtml += `<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">`;
+  warnHtml += `<b>${msg}</b><br><span class="hint">Peso total real: ${fmtKG(est.pesoTotal)}</span>`;
+}
+
+  if (showWarn){
+    warn.innerHTML = warnHtml;
+    warn.style.display = '';
+    // reanexa listener do botão de sugestão de caixa, se existir
+    const btn=$("#btnSuggestAddBox");
+    if(btn){
+      btn.onclick=()=>{
+        const id=btn.dataset.box;
+        const add=Number(btn.dataset.add||0);
+        const cur=(qtyMap.get(id)||1);
+        qtyMap.set(id, cur+add);
+        renderTable();
+      };
     }
   }else{
     warn.style.display='none';
