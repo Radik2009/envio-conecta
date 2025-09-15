@@ -64,9 +64,11 @@
   .thumb{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#0c1912}
   .thumb img{display:block;width:100%;height:74px;object-fit:cover}
   .thumb button{position:absolute;top:4px;right:4px;border:none;border-radius:8px;padding:4px 6px;background:#b63a3a;color:#fff;cursor:pointer}
-  /* Aviso de caixa */
+  /* Aviso */
   .warn{margin-top:12px;padding:10px;border:1px solid #6b1f1f;background:#170f10;border-radius:10px}
   .warn b{color:#ffd1d1}
+  /* Financeiro extra */
+  .extras{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
 </style>
 </head>
 <body>
@@ -105,6 +107,7 @@
             <tr>
               <th><input type="checkbox" id="chkAll" title="Selecionar página"></th>
               <th>Item</th>
+              <th class="right">Preço (R$)</th>
               <th class="right">Peso (kg)</th>
               <th class="right">Altura (cm)</th>
               <th class="right">Largura (cm)</th>
@@ -130,19 +133,25 @@
           <div class="col-3">
             <label class="muted">Modo de empacotamento</label>
             <select id="packMode" title="Como estimar a caixa combinada">
-              <option value="stack" selected>Empilhar (altura soma)</option>
-              <option value="auto">Auto (camadas)</option>
+              <option value="stack">Empilhar (altura soma)</option>
+              <option value="auto" selected>Auto (camadas)</option>
               <option value="side">Lado a lado (comprimento soma)</option>
             </select>
           </div>
           <div class="col-3">
             <label class="muted">Folga interna (cm)</label>
-            <input type="number" id="margin" step="1" min="0" value="3" title="Folga adicionada a cada dimensão (estimativa)">
+            <input type="number" id="margin" step="1" min="0" value="3" title="Folga adicionada a cada dimensão (estimativa)" inputmode="decimal">
           </div>
-          <div class="col-6" style="display:flex;gap:10px;align-items:center">
-            <button class="btn" id="btnCopy">Copiar resumo</button>
-            <span class="hint">Selecione itens, ajuste as quantidades e salve como cotação.</span>
+          <div class="col-3" style="display:flex;gap:10px;align-items:center;margin-top:22px">
+            <label><input type="checkbox" id="optSeguro"> Incluir seguro (estimado)</label>
           </div>
+          <div class="col-3" style="display:flex;gap:10px;align-items:center;margin-top:22px">
+            <label><input type="checkbox" id="optAR"> Aviso de Recebimento (AR)</label>
+          </div>
+        </div>
+        <div class="toolbar" style="margin-top:12px">
+          <button class="btn" id="btnCopy">Copiar resumo</button>
+          <span class="hint">Selecione itens, ajuste as quantidades e salve como cotação.</span>
         </div>
       </div>
 
@@ -158,7 +167,17 @@
           <div class="tot"><b>Largura estimada/caixa</b><span id="resLarg">–</span></div>
           <div class="tot"><b>Comprimento estimado/caixa</b><span id="resComp">–</span></div>
         </div>
+
+        <!-- Financeiro extra -->
+        <div class="extras">
+          <div class="tot"><b>Valor declarado</b><span id="resValorDeclarado">R$ 0,00</span></div>
+          <div class="tot"><b>Seguro estimado</b><span id="resSeguro">R$ 0,00</span></div>
+          <div class="tot"><b>AR (opcional)</b><span id="resAR">R$ 0,00</span></div>
+          <div class="tot"><b>Extras (Seguro + AR)</b><span id="resExtras">R$ 0,00</span></div>
+        </div>
+
         <div id="boxWarn" class="warn" style="display:none"></div>
+
         <div class="toolbar" style="margin-top:12px">
           <button class="btn" id="btnSaveSim">Salvar cotação</button>
           <button class="btn ghost" id="btnClearSim" title="Limpar seleção e resumo">Limpar simulação</button>
@@ -194,12 +213,13 @@
   <div class="modal-body">
     <div class="grid">
       <div class="col-6"><input id="fNome" placeholder="Nome do item (ex.: Brother DCP-L2540DW)"></div>
-      <div class="col-3"><input id="fPeso" type="number" step="0.01" min="0" placeholder="Peso (kg)"></div>
+      <div class="col-3"><input id="fPeso" type="number" step="0.01" min="0" placeholder="Peso (kg)" inputmode="decimal"></div>
+      <div class="col-3"><input id="fPreco" type="number" step="0.01" min="0" placeholder="Preço (R$)" inputmode="decimal"></div>
     </div>
     <div class="grid">
-      <div class="col-2"><input id="fAlt" type="number" step="0.1" min="0" placeholder="Altura (cm)"></div>
-      <div class="col-2"><input id="fLarg" type="number" step="0.1" min="0" placeholder="Largura (cm)"></div>
-      <div class="col-2"><input id="fComp"  type="number" step="0.1" min="0" placeholder="Comprimento (cm)"></div>
+      <div class="col-2"><input id="fAlt"  type="number" step="0.1" min="0" placeholder="Altura (cm)" inputmode="decimal"></div>
+      <div class="col-2"><input id="fLarg" type="number" step="0.1" min="0" placeholder="Largura (cm)" inputmode="decimal"></div>
+      <div class="col-2"><input id="fComp" type="number" step="0.1" min="0" placeholder="Comprimento (cm)" inputmode="decimal"></div>
       <div class="col-6"><span class="hint">O item será salvo na sessão atual <b id="dlgSessaoAtual">[geral]</b>.</span></div>
     </div>
 
@@ -241,11 +261,19 @@
 const $=s=>document.querySelector(s), $all=s=>Array.from(document.querySelectorAll(s));
 const fmtKG=n=>(Number(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' kg';
 const fmtDate=iso=>new Date(iso).toLocaleString('pt-BR');
+const fmtBRL=n=>(Number(n)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const clampQty=v=>Math.max(1,Math.floor(Number(v)||1)); // quantidade
 const clampNonNeg=v=>Math.max(0,Number(v)||0); // peso e dimensões
-const LS_KEY_ITEMS='ri_items_v7';
-const LS_KEY_S1='ri_sims_main_v5';
+const parsePtNumber=v=>Number(String(v).replace(',','.'))||0; // aceita vírgula
+const LS_KEY_ITEMS='ri_items_v8';
+const LS_KEY_S1='ri_sims_main_v6';
 const LIMITE_PESO_CORREIOS = 30; // limite por volume dos Correios (kg)
+const FATOR_CUBAGEM = 6000;
+const BASE_FACTOR   = 2; // até 2x o maior item antes de "espalhar" mais
+// Seguro e AR (com base no seu exemplo real)
+const INSURANCE_RATE = 43.49 / 2200; // ≈ 0.01977 (1,977%)
+const AR_PRICE = 7.75;
+
 function uid(){return Math.random().toString(36).slice(2,9)}
 
 /* ===== Estado ===== */
@@ -266,39 +294,39 @@ renderTable(); renderSims(); updateCountInfo();
 /* ===== Seeds ===== */
 function seedItems(){
   return [
-    {id:uid(),cat:'impressora',nome:'Brother DCP-L2540DW',peso:11.1,alt:35.6,larg:42.8,comp:42.9},
-    {id:uid(),cat:'impressora',nome:'Brother DCP-L5652DN',peso:17.1,alt:60.0,larg:60.0,comp:52.5},
-    {id:uid(),cat:'impressora',nome:'Brother MFC-L8900CDW',peso:28.6,alt:54.9,larg:52.6,comp:49.5},
-    {id:uid(),cat:'impressora',nome:'Epson L14150',peso:9.7,alt:25.9,larg:50.6,comp:36.5},
-    {id:uid(),cat:'monitor',nome:'Monitor Diversos (com base)',peso:2.88,alt:30.12,larg:50.33,comp:2.0},
-    {id:uid(),cat:'note',nome:'Notebook 15',peso:1.90,alt:3.0,larg:36.0,comp:25.0},
-    {id:uid(),cat:'note',nome:'Notebook 14',peso:1.90,alt:3.0,larg:34.0,comp:23.0},
-    {id:uid(),cat:'geral',nome:'All in One Positivo U1500',peso:4.14,alt:34.2,larg:45.5,comp:3.9},
-    {id:uid(),cat:'perifericos',nome:'Modem',peso:0.99,alt:15.0,larg:15.0,comp:3.00},
-    {id:uid(),cat:'perifericos',nome:'Mouse',peso:0.85,alt:4.0,larg:6.0,comp:12.0},
-    {id:uid(),cat:'perifericos',nome:'Toner 5652',peso:1.00,alt:7.0,larg:28.0,comp:16.0},
-    {id:uid(),cat:'perifericos',nome:'Toner 2540',peso:1.00,alt:4.0,larg:28.0,comp:12.0},
-    {id:uid(),cat:'perifericos',nome:'Fonte',peso:0.99,alt:3.0,larg:11.0,comp:5.0},
-    {id:uid(),cat:'perifericos',nome:'Transformador',peso:4.00,alt:13.00,larg:14.0,comp:10.0},    
-    // Caixa (exemplo do pedido)
-    {id:uid(),cat:'caixa',nome:'Caixa Brother 2540',peso:0,alt:42,larg:55,comp:51},
-    {id:uid(),cat:'caixa',nome:'Caixa Brother 5652',peso:0,alt:60,larg:60,comp:60},
-    {id:uid(),cat:'caixa',nome:'Caixa Notebook',peso:0,alt:7,larg:45,comp:35},
-    {id:uid(),cat:'caixa',nome:'Caixa Padrão',peso:0,alt:30,larg:30,comp:30}
+    {id:uid(),cat:'impressora',nome:'Brother DCP-L2540DW',preco:2289,peso:11.1,alt:35.6,larg:42.8,comp:42.9},
+    {id:uid(),cat:'impressora',nome:'Brother DCP-L5652DN',preco:3349,peso:17.1,alt:60.0,larg:60.0,comp:52.5},
+    {id:uid(),cat:'impressora',nome:'Brother MFC-L8900CDW',preco:7064,peso:28.6,alt:54.9,larg:52.6,comp:49.5},
+    {id:uid(),cat:'impressora',nome:'Epson L14150',preco:4109,peso:9.7,alt:25.9,larg:50.6,comp:36.5},
+    {id:uid(),cat:'monitor',nome:'Monitor Diversos (com base)',preco:450,peso:2.88,alt:30.12,larg:50.33,comp:2.0},
+    {id:uid(),cat:'note',nome:'Notebook 15',preco:2500,peso:4.00,alt:3.0,larg:36.0,comp:25.0},
+    {id:uid(),cat:'note',nome:'Notebook 14',preco:2500,peso:4.00,alt:3.0,larg:34.0,comp:23.0},
+    {id:uid(),cat:'geral',nome:'All in One Positivo U1500',preco:1.952,peso:4.14,alt:34.2,larg:45.5,comp:3.9},
+    {id:uid(),cat:'perifericos',nome:'Modem',preco:200,peso:0.99,alt:15.0,larg:15.0,comp:3.00},
+    {id:uid(),cat:'perifericos',nome:'Mouse',preco:50,peso:0.85,alt:4.0,larg:6.0,comp:12.0},
+    {id:uid(),cat:'perifericos',nome:'Toner 5652',preco:35,peso:1.00,alt:7.0,larg:28.0,comp:16.0},
+    {id:uid(),cat:'perifericos',nome:'Toner 2540',preco:35,peso:1.00,alt:4.0,larg:28.0,comp:12.0},
+    {id:uid(),cat:'perifericos',nome:'Fonte',preco:50,peso:0.99,alt:3.0,larg:11.0,comp:5.0},
+    {id:uid(),cat:'perifericos',nome:'Transformador',preco:150,peso:4.00,alt:13.00,larg:14.0,comp:10.0},
+    // Caixas
+    {id:uid(),cat:'caixa',nome:'Caixa Brother 2540',preco:0,peso:0,alt:42,larg:55,comp:51},
+    {id:uid(),cat:'caixa',nome:'Caixa Brother 5652',preco:0,peso:0,alt:60,larg:60,comp:60},
+    {id:uid(),cat:'caixa',nome:'Caixa Notebook',preco:0,peso:0,alt:7,larg:45,comp:35},
+    {id:uid(),cat:'caixa',nome:'Caixa Padrão',preco:0,peso:0,alt:30,larg:30,comp:30}
   ];
 }
 
 /* ===== Storage ===== */
 function loadItems(){
-  const keysTry=['ri_items_v7','ri_items_v6'];
+  const keysTry=['ri_items_v8','ri_items_v7','ri_items_v6'];
   for(const k of keysTry){
     const raw=localStorage.getItem(k);
     if(raw){ try{
       let arr=JSON.parse(raw);
       // garantia de campos
-      arr=arr.map(it=>({fotos:[],...it}));
-      // migração: mover para nova key
-      if(k!=='ri_items_v7') localStorage.setItem('ri_items_v7',JSON.stringify(arr));
+      arr=arr.map(it=>({fotos:[], preco:0, ...it}));
+      // migração para a nova key
+      if(k!=='ri_items_v8') localStorage.setItem('ri_items_v8',JSON.stringify(arr));
       return arr;
     }catch(e){} }
   }
@@ -345,6 +373,7 @@ function renderTable(){
     tr.innerHTML=`
       <td><input type="checkbox" class="rowchk" data-id="${it.id}" ${checked?'checked':''}></td>
       <td>${it.nome}${it.cat==='perifericos' && fotoCount? ` <span class="muted">[📷 ${fotoCount}]</span>`:''}</td>
+      <td class="right">${fmtBRL(it.preco || 0)}</td>
       <td class="right">${(it.peso||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
       <td class="right">${it.alt||0}</td>
       <td class="right">${it.larg||0}</td>
@@ -422,20 +451,20 @@ async function resizeImage(file, maxDim=1280, quality=0.8){
 function openNew(){
   editingId=null;
   $('#dlgTitle').textContent='Novo item';
-  $('#fNome').value=''; $('#fPeso').value='';
+  $('#fNome').value=''; $('#fPeso').value=''; $('#fPreco').value='';
   $('#fAlt').value=''; $('#fLarg').value=''; $('#fComp').value='';
   $('#dlgDelete').style.display='none'; $('#dlgHint').textContent='';
   $('#dlgSessaoAtual').textContent=`[${currentCat}]`;
   dlgFotosTemp=[];
   setFotoSectionVisible(currentCat==='perifericos');
   renderFotoGrid();
-  $('#dlg').showModal();
+  $('#dlg').showModal(); $('#fNome').focus();
 }
 function openEdit(id, gotoFotos=false){
   const it=items.find(x=>x.id===id); if(!it) return;
   editingId=id;
   $('#dlgTitle').textContent='Editar item';
-  $('#fNome').value=it.nome; $('#fPeso').value=it.peso;
+  $('#fNome').value=it.nome; $('#fPeso').value=it.peso; $('#fPreco').value=it.preco||0;
   $('#fAlt').value=it.alt; $('#fLarg').value=it.larg; $('#fComp').value=it.comp;
   $('#dlgDelete').style.display='inline-block';
   $('#dlgHint').textContent=`ID: ${id} • sessão: [${it.cat}]`;
@@ -443,29 +472,30 @@ function openEdit(id, gotoFotos=false){
   dlgFotosTemp=Array.isArray(it.fotos)? [...it.fotos]:[];
   setFotoSectionVisible(it.cat==='perifericos');
   renderFotoGrid();
-  $('#dlg').showModal();
+  $('#dlg').showModal(); $('#fNome').focus();
   if(gotoFotos && it.cat==='perifericos'){
     setTimeout(()=>$('#fotoSection').scrollIntoView({behavior:'smooth'}),50);
   }
 }
 function saveFromModal(){
   const nome=($('#fNome').value||'').trim();
-  const peso=clampNonNeg($('#fPeso').value);
-  const alt=clampNonNeg($('#fAlt').value);
-  const larg=clampNonNeg($('#fLarg').value);
-  const comp=clampNonNeg($('#fComp').value);
+  const peso=clampNonNeg(parsePtNumber($('#fPeso').value));
+  const preco=clampNonNeg(parsePtNumber($('#fPreco').value));
+  const alt=clampNonNeg(parsePtNumber($('#fAlt').value));
+  const larg=clampNonNeg(parsePtNumber($('#fLarg').value));
+  const comp=clampNonNeg(parsePtNumber($('#fComp').value));
   if(!nome){alert('Informe um nome.');return}
   if(editingId){
     const i=items.findIndex(x=>x.id===editingId);
     if(i>=0){
-      const keepCat=items[i].cat; // preserva categoria ao editar
+      const keepCat=items[i].cat; // preserva categoria
       const fotos = items[i].cat==='perifericos' ? dlgFotosTemp : (items[i].fotos||[]);
-      items[i]={id:editingId,cat:keepCat,nome,peso,alt,larg,comp,fotos};
+      items[i]={id:editingId,cat:keepCat,nome,preco,peso,alt,larg,comp,fotos};
     }
   }else{
     const cat=currentCat || 'geral';
     const fotos = cat==='perifericos' ? dlgFotosTemp : [];
-    items.unshift({id:uid(),cat,nome,peso,alt,larg,comp,fotos});
+    items.unshift({id:uid(),cat,nome,preco,peso,alt,larg,comp,fotos});
   }
   saveItems(); updateCountInfo(); $('#dlg').close(); renderTable();
 }
@@ -480,19 +510,16 @@ function deleteFromModal(){
 
 /* Eventos de fotos */
 $('#fFotos').addEventListener('change', async (e)=>{
-  const files=[...e.target.files].slice(0,30); // limite de segurança
+  const files=[...e.target.files].slice(0,30);
   for(const f of files){
     try{ const dataUrl=await resizeImage(f,1280,0.8); dlgFotosTemp.push(dataUrl); }
-    catch(_){ /* ignora arquivo problemático */ }
+    catch(_){ /* ignora */ }
   }
   renderFotoGrid();
   e.target.value='';
 });
 
-/* ===== Estimativa e caixas ===== */
-const FATOR_CUBAGEM = 6000;
-const BASE_FACTOR   = 2; // até 2x o maior item antes de "espalhar" mais
-
+/* ===== Seleção + Estimativa ===== */
 function getSelectedWithQty(){
   const arr=[];
   selectedIds.forEach(id=>{
@@ -592,7 +619,7 @@ function estimateBox(selectedAll){ // retorna métricas considerando modo "caixa
   return { alt, larg, comp, cubado, pesoTotal:pesoEquip, unidades:unidadesEquip, usesBoxes:false, boxes:[] };
 }
 
-/* ===== Seleção + Resumo ===== */
+/* ===== Resumo ===== */
 function updateSummary(){
   const sel=getSelectedWithQty();
   const est=estimateBox(sel);
@@ -608,12 +635,29 @@ function updateSummary(){
 
   $('#resCubado').textContent=fmtKG(est.cubado);
 
-  // aviso / sugestão de caixa + limite de peso Correios
+  // (Financeiro) Valor declarado (só equipamentos)
+  const valorDeclarado = sel
+    .filter(i=>i.cat!=='caixa')
+    .reduce((s,i)=> s + (Number(i.preco)||0) * (i.qty||0), 0);
+
+  const usarSeguro = $('#optSeguro').checked;
+  const usarAR = $('#optAR').checked;
+
+  const valorSeguro = usarSeguro ? (valorDeclarado * INSURANCE_RATE) : 0;
+  const valorAR     = usarAR ? AR_PRICE : 0;
+  const extrasTotal = valorSeguro + valorAR;
+
+  $('#resValorDeclarado').textContent = fmtBRL(valorDeclarado);
+  $('#resSeguro').textContent         = fmtBRL(valorSeguro);
+  $('#resAR').textContent             = fmtBRL(valorAR);
+  $('#resExtras').textContent         = fmtBRL(extrasTotal);
+
+  // Avisos
   const warn=$('#boxWarn');
   let warnHtml = '';
   let showWarn = false;
 
-  // (A) Avisos de caixa (já existentes)
+  // (A) Avisos de caixa
   if(est.usesBoxes){
     if(est.overflow){
       showWarn = true;
@@ -632,20 +676,18 @@ function updateSummary(){
     }
   }
 
-  // (B) NOVO: Limite de peso dos Correios (30 kg por volume)
-  // Considera a regra prática de tarifação: o maior entre peso real e cubado.
+  // (B) Limite de peso dos Correios (30 kg por volume) usando peso tarifado
   const pesoTarifado = Math.max(est.pesoTotal || 0, est.cubado || 0);
-  if ((est.pesoTotal || 0) > LIMITE_PESO_CORREIOS){
-  const msg = `Peso superior ao limite dos correrios, cotação deve ser feito pela JEM`;
-  showWarn = true;
-  if (warnHtml) warnHtml += `<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">`;
-  warnHtml += `<b>${msg}</b><br><span class="hint">Peso total real: ${fmtKG(est.pesoTotal)}</span>`;
-}
+  if (pesoTarifado > LIMITE_PESO_CORREIOS){
+    const msg = `Peso tarifado supera o limite dos Correios (30 kg/volume); cotação deve ser feita pela JEM.`;
+    showWarn = true;
+    if (warnHtml) warnHtml += `<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">`;
+    warnHtml += `<b>${msg}</b><br><span class="hint">Peso real: ${fmtKG(est.pesoTotal)} • Peso cubado: ${fmtKG(est.cubado)}</span>`;
+  }
 
   if (showWarn){
     warn.innerHTML = warnHtml;
     warn.style.display = '';
-    // reanexa listener do botão de sugestão de caixa, se existir
     const btn=$("#btnSuggestAddBox");
     if(btn){
       btn.onclick=()=>{
@@ -678,14 +720,22 @@ function buildSummaryText(name=''){
   const itensCaixa = sel.filter(i=>i.cat==='caixa');
 
   const itensEquipTxt = itensEquip.length
-    ? itensEquip.map(it=>`- ${it.nome} — ${it.peso} kg — ${it.alt}×${it.larg}×${it.comp} cm — Qtd: ${it.qty}`).join('\n')
+    ? itensEquip.map(it=>`- ${it.nome} — ${fmtBRL(it.preco)} — ${it.peso} kg — ${it.alt}×${it.larg}×${it.comp} cm — Qtd: ${it.qty}`).join('\n')
     : '(nenhum equipamento selecionado)';
 
   const caixasTxt = itensCaixa.length
     ? '\nCaixas:\n' + itensCaixa.map(c=>`- ${c.nome} — ${c.alt}×${c.larg}×${c.comp} cm — Qtd: ${c.qty}`).join('\n')
     : '';
 
-  return [
+  // Financeiro
+  const valorDeclarado = itensEquip.reduce((s,i)=> s + (Number(i.preco)||0) * (i.qty||0), 0);
+  const usarSeguro = $('#optSeguro').checked;
+  const usarAR = $('#optAR').checked;
+  const valorSeguro = usarSeguro ? valorDeclarado * INSURANCE_RATE : 0;
+  const valorAR     = usarAR ? AR_PRICE : 0;
+  const extrasTotal = valorSeguro + valorAR;
+
+  const cabeca = [
     name ? `Cotação: ${name}` : 'Cotação',
     `Itens de equipamento (${est.unidades} un.):`,
     itensEquipTxt,
@@ -694,9 +744,18 @@ function buildSummaryText(name=''){
     est.usesBoxes
       ? `Cubagem (soma das caixas): ${est.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`
       : `Caixa estimada: ${est.alt}×${est.larg}×${est.comp} cm\nPeso cubado: ${est.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
-    !est.usesBoxes ? `Empacotamento: ${modeLabel} | Folga: ${margin} cm` : `Empacotamento: caixas definidas`,
-    `Data: ${new Date().toLocaleString('pt-BR')}`
-  ].join('\n');
+    !est.usesBoxes ? `Empacotamento: ${modeLabel} | Folga: ${margin} cm` : `Empacotamento: caixas definidas`
+  ];
+
+  const financeiro = [
+    `Valor declarado: ${fmtBRL(valorDeclarado)}`,
+    `Seguro estimado: ${fmtBRL(valorSeguro)} ${usarSeguro ? '(ativado)' : '(desativado)'} — taxa usada: ${(INSURANCE_RATE*100).toFixed(3)}%`,
+    `AR: ${fmtBRL(valorAR)} ${usarAR ? '(ativado)' : '(desativado)'}`,
+    `Extras (Seguro + AR): ${fmtBRL(extrasTotal)}`
+  ];
+
+  cabeca.push(...financeiro, `Data: ${new Date().toLocaleString('pt-BR')}`);
+  return cabeca.join('\n');
 }
 async function copySummary(){
   const text=buildSummaryText();
@@ -713,16 +772,26 @@ function saveSimulation(name){
   if(!sel.length){ alert('Selecione ao menos um item.'); return; }
   name=(name||'').trim() || `Simulação ${new Date().toLocaleDateString('pt-BR')}`;
   const est=estimateBox(sel);
+
+  // financeiro atual
+  const valorDeclarado = sel.filter(i=>i.cat!=='caixa').reduce((s,i)=> s + (Number(i.preco)||0)*(i.qty||0), 0);
+  const seguroOn = $('#optSeguro').checked;
+  const arOn     = $('#optAR').checked;
+  const valorSeguro = seguroOn ? valorDeclarado * INSURANCE_RATE : 0;
+  const valorAR     = arOn ? AR_PRICE : 0;
+
   const sim={
     id:uid(),
     name,
     dateISO:new Date().toISOString(),
     packMode:$('#packMode').value,
     margin:Number($('#margin').value)||0,
+    options:{ seguro: seguroOn, ar: arOn, insuranceRate: INSURANCE_RATE, arPrice: AR_PRICE },
     selected: sel.map(it=>({id:it.id, qty:it.qty})),
-    snapshot: sel.map(it=>({nome:it.nome,cat:it.cat,qty:it.qty,peso:it.peso,alt:it.alt,larg:it.larg,comp:it.comp})),
+    snapshot: sel.map(it=>({nome:it.nome,cat:it.cat,qty:it.qty,preco:it.preco,peso:it.peso,alt:it.alt,larg:it.larg,comp:it.comp})),
     summary:{units:est.unidades,peso:est.pesoTotal,alt:est.alt,larg:est.larg,comp:est.comp,cubado:est.cubado,usesBoxes:est.usesBoxes},
-    boxes: est.boxes || []
+    boxes: est.boxes || [],
+    financial:{ valorDeclarado, valorSeguro, valorAR, extras: (valorSeguro+valorAR) }
   };
   simsMain.push(sim);
   simsMain.sort((a,b)=>new Date(b.dateISO)-new Date(a.dateISO));
@@ -760,7 +829,7 @@ function renderSims(){
     trd.className='sim-detail';
     trd.id=`detail-${sim.id}`;
     trd.style.display='none';
-    const itensTxt=(sim.snapshot||[]).map(s=>`• [${s.cat}] ${s.nome}  —  Qtd: ${s.qty}  —  ${s.peso} kg  —  ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
+    const itensTxt=(sim.snapshot||[]).map(s=>`• [${s.cat}] ${s.nome}  —  Qtd: ${s.qty}  —  ${fmtBRL(s.preco||0)}  —  ${s.peso} kg  —  ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
     trd.innerHTML=`<td colspan="6"><pre>${itensTxt || '—'}</pre></td>`;
     tbody.appendChild(trd);
   });
@@ -783,6 +852,8 @@ function applySim(id){
   const {idx,sim}=findSim(id); if(idx<0) return;
   $('#packMode').value=sim.packMode||'auto';
   $('#margin').value=sim.margin||0;
+  $('#optSeguro').checked = !!(sim.options && sim.options.seguro);
+  $('#optAR').checked     = !!(sim.options && sim.options.ar);
   selectedIds=new Set();
   qtyMap=new Map();
   if(sim.selected){
@@ -798,14 +869,26 @@ function applySim(id){
 }
 async function copySim(id){
   const {idx,sim}=findSim(id); if(idx<0) return;
-  const itensTxt=(sim.snapshot||[]).map(s=>`- [${s.cat}] ${s.nome} — Qtd: ${s.qty} — ${s.peso} kg — ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
-  const body=[
+  const itensTxt=(sim.snapshot||[]).map(s=>`- [${s.cat}] ${s.nome} — Qtd: ${s.qty} — ${fmtBRL(s.preco||0)} — ${s.peso} kg — ${s.alt}×${s.larg}×${s.comp} cm`).join('\n');
+
+  const declared = (sim.financial?.valorDeclarado ??
+                    sim.snapshot?.reduce((s,x)=> s + ((x.preco||0)*(x.qty||0)),0) ?? 0);
+  const rate = sim.options?.insuranceRate ?? INSURANCE_RATE;
+  const seg  = (sim.financial?.valorSeguro ?? (sim.options?.seguro ? declared*rate : 0));
+  const arV  = (sim.financial?.valorAR ?? (sim.options?.ar ? (sim.options?.arPrice??AR_PRICE) : 0));
+  const extras = seg + arV;
+
+  const body = [
     `Cotação: ${sim.name}`,
     `Itens (equip.: ${sim.summary.units||0} un.):`,
     itensTxt||'(snapshot não disponível)',
     `\nPeso total (equip.): ${sim.summary.peso.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
     `Cubagem: ${sim.summary.cubado.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})} kg`,
     `Empacotamento: ${sim.summary.usesBoxes ? 'caixas' : sim.packMode} | Folga: ${sim.margin} cm`,
+    `Valor declarado: ${fmtBRL(declared)}`,
+    `Seguro estimado: ${fmtBRL(seg)} ${sim.options?.seguro ? '(ativado)' : '(desativado)'} — taxa usada: ${(rate*100).toFixed(3)}%`,
+    `AR: ${fmtBRL(arV)} ${sim.options?.ar ? '(ativado)' : '(desativado)'}`,
+    `Extras (Seguro + AR): ${fmtBRL(extras)}`,
     `Data: ${fmtDate(sim.dateISO)}`
   ].join('\n');
   try{ await navigator.clipboard.writeText(body); alert('Resumo da simulação copiado!'); }
@@ -844,6 +927,8 @@ $('#btnPrev').addEventListener('click', ()=>{ if(currentPage>1){currentPage--; r
 $('#btnNext').addEventListener('click', ()=>{ currentPage++; renderTable(); });
 $('#packMode').addEventListener('change', updateSummary);
 $('#margin').addEventListener('input', updateSummary);
+$('#optSeguro').addEventListener('change', updateSummary);
+$('#optAR').addEventListener('change', updateSummary);
 $('#btnCopy').addEventListener('click', copySummary);
 $('#btnSaveSim').addEventListener('click', ()=>{
   if(!getSelectedWithQty().length){ alert('Selecione ao menos um item.'); return; }
